@@ -1,0 +1,127 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { COLORS, RADIUS, SPACING } from '../theme/colors';
+import { supabase } from '../config/supabase';
+
+export default function HomeScreen({ navigation }) {
+  const [matchs, setMatchs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const chargerMatchs = async () => {
+    try {
+      const { data } = await supabase.from('matchs').select('*').eq('statut','ouvert').order('created_at',{ascending:false});
+      setMatchs(data || []);
+    } catch(e) { setMatchs([]); }
+    setLoading(false);
+    setRefreshing(false);
+  };
+
+  useEffect(() => { chargerMatchs(); }, []);
+
+  const onRefresh = () => { setRefreshing(true); chargerMatchs(); };
+
+  const rejoindre = async (match) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { Alert.alert('⚠️','Tu dois être connecté.'); return; }
+      const { error } = await supabase.from('participations').insert({ match_id: match.id, joueur_id: user.id, statut: 'en_attente', cote: 'Peu importe' });
+      if (error) throw error;
+      Alert.alert('✅ Demande envoyée !','Le créateur va recevoir ta demande.');
+    } catch(e) { Alert.alert('❌ Erreur', e.message); }
+  };
+
+  const formatMsg = (m) => {
+    if (m.type_match==='binome') return `🎾 Cherche binôme ou 2 joueurs (1G · 1D)\nNiveau ${m.niveau}`;
+    if (m.type_match==='1j') return `🎾 Cherche 1 joueur · Niveau ${m.niveau}`;
+    if (m.type_match==='2j') return `🎾 Cherche 2 joueurs · Niveau ${m.niveau}`;
+    if (m.type_match==='3j') return `🎾 Cherche 3 joueurs · Niveau ${m.niveau}`;
+    return `🎾 Match · Niveau ${m.niveau}`;
+  };
+
+  return (
+    <SafeAreaView style={s.safe}>
+      <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.green}/>}>
+        <View style={s.header}>
+          <View>
+            <Text style={s.greet}>Bonjour 👋</Text>
+            <Text style={s.uname}>PadelKom <Text style={{color:COLORS.green}}>.</Text></Text>
+          </View>
+          <TouchableOpacity style={s.notifBtn}><Text style={{fontSize:20}}>🔔</Text><View style={s.notifDot}/></TouchableOpacity>
+        </View>
+        <View style={s.banner}>
+          <View><Text style={s.bannerTitle}>Trouve ton match 🎾</Text><Text style={s.bannerSub}>Casablanca · Niveau certifié</Text></View>
+          <Text style={{fontSize:30}}>🎾</Text>
+        </View>
+        <View style={s.secHeader}>
+          <Text style={s.secTitle}>Matchs disponibles</Text>
+          <TouchableOpacity onPress={onRefresh}><Text style={s.secLink}>Actualiser</Text></TouchableOpacity>
+        </View>
+        {loading ? (
+          <View style={s.center}><ActivityIndicator color={COLORS.green} size="large"/><Text style={s.loadText}>Chargement…</Text></View>
+        ) : matchs.length === 0 ? (
+          <View style={s.center}>
+            <Text style={{fontSize:40,marginBottom:12}}>🎾</Text>
+            <Text style={s.emptyTitle}>Aucun match disponible</Text>
+            <Text style={s.emptySub}>Sois le premier à créer un match !</Text>
+            <TouchableOpacity style={s.btnCreer} onPress={()=>navigation.navigate('Creer')} activeOpacity={0.85}>
+              <Text style={s.btnCreerText}>+ Créer un match</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:SPACING.md,gap:12}}>
+            {matchs.map((m,i) => (
+              <View key={m.id} style={[s.card,i===0&&s.cardFeat]}>
+                <View style={s.cardTime}>{i===0&&<View style={s.dot}/>}<Text style={s.cardTimeText}>{m.jour} · {m.heure}</Text></View>
+                <Text style={s.cardMsg}>{formatMsg(m)}</Text>
+                <Text style={s.cardLieu}>📍 {m.club}</Text>
+                <View style={s.cardFoot}>
+                  <View style={s.pill}><Text style={s.pillText}>Niveau {m.niveau}</Text></View>
+                  <Text style={s.spots}><Text style={{color:COLORS.text,fontWeight:'700'}}>{m.places_libres}</Text> place{m.places_libres>1?'s':''}</Text>
+                </View>
+                <TouchableOpacity style={s.joinBtn} onPress={()=>rejoindre(m)} activeOpacity={0.85}>
+                  <Text style={s.joinBtnText}>🎾 Rejoindre</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+        <View style={{height:32}}/>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  safe:{flex:1,backgroundColor:COLORS.dark},
+  header:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingHorizontal:SPACING.md,paddingTop:SPACING.md,paddingBottom:SPACING.sm},
+  greet:{fontSize:13,color:COLORS.text2},
+  uname:{fontSize:24,fontWeight:'900',color:COLORS.text},
+  notifBtn:{width:44,height:44,backgroundColor:COLORS.card,borderRadius:RADIUS.md,borderWidth:1,borderColor:COLORS.border,alignItems:'center',justifyContent:'center',position:'relative'},
+  notifDot:{position:'absolute',top:8,right:9,width:8,height:8,backgroundColor:COLORS.green,borderRadius:4,borderWidth:2,borderColor:COLORS.dark},
+  banner:{marginHorizontal:SPACING.md,marginBottom:SPACING.md,backgroundColor:COLORS.green,borderRadius:RADIUS.lg,padding:18,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
+  bannerTitle:{fontSize:16,fontWeight:'900',color:'#0A0A0A',marginBottom:4},
+  bannerSub:{fontSize:12,color:'rgba(0,0,0,0.6)'},
+  secHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingHorizontal:SPACING.md,marginBottom:12},
+  secTitle:{fontSize:16,fontWeight:'800',color:COLORS.text},
+  secLink:{fontSize:12,color:COLORS.green,fontWeight:'600'},
+  center:{alignItems:'center',paddingVertical:40,paddingHorizontal:SPACING.lg},
+  loadText:{fontSize:14,color:COLORS.text2,marginTop:12},
+  emptyTitle:{fontSize:18,fontWeight:'800',color:COLORS.text,marginBottom:8},
+  emptySub:{fontSize:14,color:COLORS.text2,textAlign:'center',marginBottom:20},
+  btnCreer:{backgroundColor:COLORS.green,borderRadius:RADIUS.lg,paddingVertical:13,paddingHorizontal:24},
+  btnCreerText:{fontSize:14,fontWeight:'800',color:'#000'},
+  card:{backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:16,minWidth:220,borderWidth:1,borderColor:COLORS.border},
+  cardFeat:{backgroundColor:'#1E2A0E',borderColor:'rgba(200,245,74,0.2)'},
+  cardTime:{flexDirection:'row',alignItems:'center',gap:6,marginBottom:8},
+  dot:{width:7,height:7,backgroundColor:COLORS.green,borderRadius:4},
+  cardTimeText:{fontSize:11,color:COLORS.green,fontWeight:'600'},
+  cardMsg:{fontSize:14,color:COLORS.text,lineHeight:22,marginBottom:8,fontWeight:'600'},
+  cardLieu:{fontSize:12,color:COLORS.text2,marginBottom:10},
+  cardFoot:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:10},
+  pill:{backgroundColor:'rgba(200,245,74,0.12)',borderRadius:RADIUS.full,paddingVertical:4,paddingHorizontal:10,borderWidth:1,borderColor:'rgba(200,245,74,0.2)'},
+  pillText:{fontSize:11,color:COLORS.green,fontWeight:'600'},
+  spots:{fontSize:11,color:COLORS.text2},
+  joinBtn:{backgroundColor:COLORS.green,borderRadius:RADIUS.md,paddingVertical:10,alignItems:'center'},
+  joinBtnText:{fontSize:13,fontWeight:'800',color:'#000'},
+});

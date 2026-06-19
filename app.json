@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "PadelKom",
+    "slug": "padelkom",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": { "backgroundColor": "#0A0A0A" },
+    "ios": { "supportsTablet": false, "bundleIdentifier": "com.padelkom.app" },
+    "android": { "package": "com.padelkom.app" },
+    "web": {}
+  }
+}
