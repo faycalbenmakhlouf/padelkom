@@ -15,6 +15,11 @@ export default function MonProfilScreen({ navigation, route }) {
     chargerProfil();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', chargerProfil);
+    return unsubscribe;
+  }, [navigation]);
+
   const chargerProfil = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -47,7 +52,7 @@ export default function MonProfilScreen({ navigation, route }) {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={s.header}>
           <Text style={s.title}>Mon Profil</Text>
-          <TouchableOpacity style={s.editBtn} activeOpacity={0.8}>
+          <TouchableOpacity style={s.editBtn} activeOpacity={0.8} onPress={() => navigation.navigate('EditProfil')}>
             <Text style={s.editBtnText}>✏️ Modifier</Text>
           </TouchableOpacity>
         </View>
