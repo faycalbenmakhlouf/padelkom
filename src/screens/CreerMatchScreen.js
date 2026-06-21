@@ -19,7 +19,7 @@ export default function CreerMatchScreen({ navigation }) {
   const [nbJoueurs, setNbJoueurs] = useState(null);   // 1 | 2 | 3
   const [slots, setSlots] = useState([]);              // [{cote, genre}]
 
-  const isBinome = genreMatch === 'Binome';
+  const isBinome = nbJoueurs === 'binome';
 
   const handleGenreMatch = (g) => {
     setGenreMatch(g);
@@ -29,7 +29,11 @@ export default function CreerMatchScreen({ navigation }) {
 
   const handleNbJoueurs = (nb) => {
     setNbJoueurs(nb);
-    setSlots(Array.from({ length: nb }, () => ({ cote: null, genre: genreMatch === 'Mixte' ? null : genreMatch })));
+    if (nb === 'binome') {
+      setSlots([]);
+    } else {
+      setSlots(Array.from({ length: nb }, () => ({ cote: null, genre: genreMatch === 'Mixte' ? null : genreMatch })));
+    }
   };
 
   const setSlotCote = (i, cote) => {
@@ -43,12 +47,12 @@ export default function CreerMatchScreen({ navigation }) {
   const slotsValides = isBinome || (slots.length > 0 && slots.every(s => s.cote && s.genre));
 
   const getMsg = () => {
-    if (!genreMatch || !niveau) return '…remplis le formulaire';
+    if (!genreMatch || !nbJoueurs || !niveau) return '…remplis le formulaire';
     const h = HEURES[heure], j = JOURS[jour].j, c = CLUBS[club].nom;
-    if (isBinome) return `🎾 Cherche un binôme · Niveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
-    if (!nbJoueurs || !slotsValides) return '…choisis les joueurs recherchés';
-    const details = slots.map(s => `${s.genre === 'Homme' ? '👨' : '👩'} ${s.cote}`).join(' · ');
-    return `🎾 Cherche ${nbJoueurs} joueur${nbJoueurs > 1 ? 's' : ''} · ${details}\nNiveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
+    if (isBinome) return `🎾 Cherche un binôme ${genreMatch} · Niveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
+    if (!slotsValides) return '…choisis le côté pour chaque joueur';
+    const details = slots.map(sl => `${sl.genre === 'Homme' ? '👨' : '👩'} ${sl.cote}`).join(' · ');
+    return `🎾 ${genreMatch} · Cherche ${nbJoueurs} joueur${nbJoueurs > 1 ? 's' : ''}\n${details} · Niveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
   };
 
   const publier = async () => {
@@ -59,7 +63,7 @@ export default function CreerMatchScreen({ navigation }) {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const nb = isBinome ? 2 : nbJoueurs;
+      const nb = isBinome ? 2 : Number(nbJoueurs);
       const { error } = await supabase.from('matchs').insert({
         createur_id: user?.id, jour: JOURS[jour].j, heure: HEURES[heure],
         club: CLUBS[club].nom, type_match: isBinome ? 'binome' : `${nbJoueurs}j`,
@@ -113,25 +117,33 @@ export default function CreerMatchScreen({ navigation }) {
           {/* Type de match */}
           <Text style={s.lbl}>⚥ Type de match</Text>
           <View style={s.chips4}>
-            {['Homme','Femme','Mixte','Binome'].map(g => (
+            {['Homme','Femme','Mixte'].map(g => (
               <TouchableOpacity key={g} style={[s.chip4, genreMatch===g && s.chip4A]} onPress={() => handleGenreMatch(g)} activeOpacity={0.8}>
-                <Text style={{fontSize:18}}>{g==='Homme'?'👨':g==='Femme'?'👩':g==='Mixte'?'👫':'🤝'}</Text>
+                <Text style={{fontSize:18}}>{g==='Homme'?'👨':g==='Femme'?'👩':'👫'}</Text>
                 <Text style={[s.chip4Text, genreMatch===g && s.chip4TextA]}>{g}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* Nombre de joueurs (sauf Binôme) */}
-          {genreMatch && !isBinome && (
+          {/* Nombre de joueurs */}
+          {genreMatch && (
             <>
-              <Text style={s.lbl}>👥 Nombre de joueurs cherchés</Text>
+              <Text style={s.lbl}>👥 Tu cherches</Text>
               <View style={s.row}>
                 {[1,2,3].map(n => (
                   <TouchableOpacity key={n} style={[s.nbChip, nbJoueurs===n && s.nbChipA]} onPress={() => handleNbJoueurs(n)} activeOpacity={0.8}>
-                    <Text style={[s.nbText, nbJoueurs===n && {color:COLORS.green}]}>{n}</Text>
+                    <Text style={[s.nbText, nbJoueurs===n && {color:COLORS.green}]}>{n} joueur{n>1?'s':''}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
+              <TouchableOpacity style={[s.binomeBtn, nbJoueurs==='binome' && s.binomeBtnA]} onPress={() => handleNbJoueurs('binome')} activeOpacity={0.8}>
+                <Text style={{fontSize:20}}>🤝</Text>
+                <View style={{flex:1}}>
+                  <Text style={[s.binomeTitle, nbJoueurs==='binome' && {color:COLORS.green}]}>Binôme</Text>
+                  <Text style={s.binomeSub}>Une équipe de 2 joueurs déjà constituée</Text>
+                </View>
+                {nbJoueurs==='binome' && <Text style={{color:COLORS.green,fontSize:16}}>✓</Text>}
+              </TouchableOpacity>
             </>
           )}
 
@@ -213,14 +225,18 @@ const s = StyleSheet.create({
   clubMeta:{fontSize:11,color:COLORS.text2},
   check:{width:22,height:22,borderRadius:11,backgroundColor:COLORS.green,alignItems:'center',justifyContent:'center'},
   radio:{width:22,height:22,borderRadius:11,borderWidth:2,borderColor:COLORS.border},
-  chips4:{flexDirection:'row',flexWrap:'wrap',gap:10,marginBottom:16},
-  chip4:{width:'47%',backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:14,borderWidth:1.5,borderColor:COLORS.border,alignItems:'center',gap:6},
+  chips4:{flexDirection:'row',gap:10,marginBottom:16},
+  chip4:{flex:1,backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:14,borderWidth:1.5,borderColor:COLORS.border,alignItems:'center',gap:6},
   chip4A:{backgroundColor:'rgba(200,245,74,0.07)',borderColor:COLORS.green},
   chip4Text:{fontSize:13,fontWeight:'800',color:COLORS.text2},
   chip4TextA:{color:COLORS.green},
-  nbChip:{flex:1,backgroundColor:COLORS.card,borderRadius:RADIUS.lg,paddingVertical:16,alignItems:'center',borderWidth:1.5,borderColor:COLORS.border},
+  nbChip:{flex:1,backgroundColor:COLORS.card,borderRadius:RADIUS.lg,paddingVertical:14,alignItems:'center',borderWidth:1.5,borderColor:COLORS.border},
   nbChipA:{backgroundColor:'rgba(200,245,74,0.1)',borderColor:COLORS.green},
-  nbText:{fontSize:22,fontWeight:'900',color:COLORS.text2},
+  nbText:{fontSize:13,fontWeight:'800',color:COLORS.text2,textAlign:'center'},
+  binomeBtn:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:14,borderWidth:1.5,borderColor:COLORS.border,marginBottom:16},
+  binomeBtnA:{backgroundColor:'rgba(200,245,74,0.07)',borderColor:COLORS.green},
+  binomeTitle:{fontSize:14,fontWeight:'800',color:COLORS.text,marginBottom:2},
+  binomeSub:{fontSize:11,color:COLORS.text2},
   slotCard:{backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:14,marginBottom:12,borderWidth:1,borderColor:COLORS.border},
   slotTitle:{fontSize:14,fontWeight:'800',color:COLORS.green,marginBottom:10},
   slotLabel:{fontSize:11,fontWeight:'700',color:COLORS.text2,marginBottom:6,textTransform:'uppercase'},
