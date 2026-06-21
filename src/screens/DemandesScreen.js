@@ -3,12 +3,15 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Act
 import { COLORS, RADIUS, SPACING } from '../theme/colors';
 import { supabase } from '../config/supabase';
 
+const RAISONS_REFUS = ['Déjà complet', 'Autre raison'];
+
 export default function DemandesScreen({ navigation, route }) {
   const { matchId } = route.params;
   const [demandes, setDemandes] = useState([]);
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(null);
+  const [refusModal, setRefusModal] = useState(null);
 
   useEffect(() => {
     charger();
@@ -32,7 +35,8 @@ export default function DemandesScreen({ navigation, route }) {
     setLoading(false);
   };
 
-  const traiter = async (participation, action) => {
+  const traiter = async (participation, action, raison = null) => {
+    setRefusModal(null);
     setProcessing(participation.id);
     const newStatut = action === 'accepter' ? 'confirme' : 'refuse';
 
@@ -48,10 +52,13 @@ export default function DemandesScreen({ navigation, route }) {
       });
       setMatch(m => ({ ...m, places_libres: Math.max(0, m.places_libres - 1) }));
     } else if (action === 'refuser') {
+      const msg = raison === 'Déjà complet'
+        ? `Ta demande pour le match du ${match.jour} à ${match.heure} — ${match.club} a été refusée. Le match est déjà complet.`
+        : `Ta demande pour le match du ${match.jour} à ${match.heure} — ${match.club} n'a pas été retenue.`;
       await supabase.from('notifications').insert({
         user_id: participation.joueur_id,
         type: 'match_annule',
-        message: `Ta demande pour le match du ${match.jour} à ${match.heure} — ${match.club} n'a pas été retenue.`,
+        message: msg,
         match_id: matchId,
       });
     }
@@ -106,7 +113,7 @@ export default function DemandesScreen({ navigation, route }) {
                 <View style={s.actions}>
                   <TouchableOpacity
                     style={[s.btnRefuser, processing === d.id && { opacity: 0.5 }]}
-                    onPress={() => traiter(d, 'refuser')}
+                    onPress={() => setRefusModal(d)}
                     disabled={!!processing}
                     activeOpacity={0.85}
                   >
@@ -121,6 +128,19 @@ export default function DemandesScreen({ navigation, route }) {
                     {processing === d.id ? <ActivityIndicator color="#000" size="small" /> : <Text style={s.btnAccepterText}>✓ Accepter</Text>}
                   </TouchableOpacity>
                 </View>
+                {refusModal?.id === d.id && (
+                  <View style={s.raisonWrap}>
+                    <Text style={s.raisonTitle}>Raison du refus :</Text>
+                    {RAISONS_REFUS.map(r => (
+                      <TouchableOpacity key={r} style={s.raisonBtn} onPress={() => traiter(d, 'refuser', r)} activeOpacity={0.8}>
+                        <Text style={s.raisonText}>{r}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity onPress={() => setRefusModal(null)} style={s.raisonAnnuler}>
+                      <Text style={s.raisonAnnulerText}>Annuler</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
           })}
@@ -152,4 +172,10 @@ const s = StyleSheet.create({
   btnRefuserText: { fontSize: 14, fontWeight: '700', color: COLORS.text2 },
   btnAccepter: { flex: 1, paddingVertical: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.green, alignItems: 'center' },
   btnAccepterText: { fontSize: 14, fontWeight: '800', color: '#000' },
+  raisonWrap: { marginTop: 10, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 12, borderWidth: 1, borderColor: COLORS.border },
+  raisonTitle: { fontSize: 12, color: COLORS.text2, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase' },
+  raisonBtn: { paddingVertical: 10, paddingHorizontal: 12, backgroundColor: COLORS.card, borderRadius: RADIUS.sm, marginBottom: 6, borderWidth: 1, borderColor: COLORS.border },
+  raisonText: { fontSize: 14, color: COLORS.text, fontWeight: '600' },
+  raisonAnnuler: { paddingVertical: 8, alignItems: 'center' },
+  raisonAnnulerText: { fontSize: 13, color: COLORS.text2 },
 });
