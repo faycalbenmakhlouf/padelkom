@@ -56,20 +56,22 @@ export default function NotificationsScreen({ navigation, route }) {
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}>
           {notifs.map(n => (
-            <View key={n.id} style={[s.notif, !n.lu && s.notifUnread]}>
-              <View style={s.iconWrap}>
-                <Text style={{ fontSize: 20 }}>{icons[n.type] || '🔔'}</Text>
+            <View key={n.id}>
+              <View style={[s.notif, !n.lu && s.notifUnread]}>
+                <View style={s.iconWrap}>
+                  <Text style={{ fontSize: 20 }}>{icons[n.type] || '🔔'}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.message}>{n.message}</Text>
+                  <Text style={s.time}>{formatDate(n.created_at)}</Text>
+                </View>
+                {!n.lu && <View style={s.unreadDot} />}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.message}>{n.message}</Text>
-                <Text style={s.time}>{formatDate(n.created_at)}</Text>
-              </View>
-              {!n.lu && <View style={s.unreadDot} />}
-            </View>
-            {n.type === 'nouveau_joueur' && n.match_id && (
-              <TouchableOpacity style={s.voirBtn} onPress={() => navigation.navigate('Demandes', { matchId: n.match_id })}>
-                <Text style={s.voirBtnText}>Voir les demandes →</Text>
-              </TouchableOpacity>
+              {n.type === 'nouveau_joueur' && n.match_id && (
+                <TouchableOpacity style={s.voirBtn} onPress={() => navigation.navigate('Demandes', { matchId: n.match_id })}>
+                  <Text style={s.voirBtnText}>Voir les demandes →</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ))}
         </ScrollView>
