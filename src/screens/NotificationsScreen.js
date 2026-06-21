@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Act
 import { COLORS, RADIUS, SPACING } from '../theme/colors';
 import { supabase } from '../config/supabase';
 
-export default function NotificationsScreen({ navigation }) {
+export default function NotificationsScreen({ navigation, route }) {
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -66,6 +66,11 @@ export default function NotificationsScreen({ navigation }) {
               </View>
               {!n.lu && <View style={s.unreadDot} />}
             </View>
+            {n.type === 'nouveau_joueur' && n.match_id && (
+              <TouchableOpacity style={s.voirBtn} onPress={() => navigation.navigate('Demandes', { matchId: n.match_id })}>
+                <Text style={s.voirBtnText}>Voir les demandes →</Text>
+              </TouchableOpacity>
+            </View>
           ))}
         </ScrollView>
       )}
@@ -88,4 +93,6 @@ const s = StyleSheet.create({
   message: { fontSize: 14, color: COLORS.text, fontWeight: '500', marginBottom: 4, lineHeight: 20 },
   time: { fontSize: 11, color: COLORS.text2 },
   unreadDot: { width: 8, height: 8, backgroundColor: COLORS.green, borderRadius: 4 },
+  voirBtn: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: 'rgba(200,245,74,0.1)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(200,245,74,0.2)', alignSelf: 'flex-start', marginLeft: 56 },
+  voirBtnText: { fontSize: 12, color: COLORS.green, fontWeight: '700' },
 });
