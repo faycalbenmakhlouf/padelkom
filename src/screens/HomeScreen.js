@@ -7,6 +7,7 @@ export default function HomeScreen({ navigation }) {
   const [matchs, setMatchs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [nbNotifs, setNbNotifs] = useState(0);
 
   const chargerMatchs = async () => {
     try {
@@ -17,7 +18,17 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  useEffect(() => { chargerMatchs(); }, []);
+  useEffect(() => {
+    chargerMatchs();
+    chargerNotifs();
+  }, []);
+
+  const chargerNotifs = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('lu', false);
+    setNbNotifs(count || 0);
+  };
 
   const onRefresh = () => { setRefreshing(true); chargerMatchs(); };
 
@@ -27,8 +38,13 @@ export default function HomeScreen({ navigation }) {
       if (!user) { Alert.alert('⚠️','Tu dois être connecté.'); return; }
       const { error } = await supabase.from('participations').insert({ match_id: match.id, joueur_id: user.id, statut: 'en_attente', cote: 'Peu importe' });
       if (error) throw error;
-      Alert.alert('✅ Demande envoyée !','Le créateur va recevoir ta demande.');
-    } catch(e) { Alert.alert('❌ Erreur', e.message); }
+      const { data: profil } = await supabase.from('profiles').select('prenom, nom').eq('id', user.id).single();
+      const nomJoueur = profil ? `${profil.prenom} ${profil.nom ? profil.nom[0] + '.' : ''}`.trim() : 'Un joueur';
+      if (match.createur_id && match.createur_id !== user.id) {
+        await supabase.from('notifications').insert({ user_id: match.createur_id, type: 'nouveau_joueur', message: `${nomJoueur} veut rejoindre ton match du ${match.jour} à ${match.heure} — ${match.club}`, match_id: match.id });
+      }
+      window.alert('Demande envoyée ! Le créateur va recevoir ta demande.');
+    } catch(e) { window.alert('Erreur : ' + e.message); }
   };
 
   const formatMsg = (m) => {
@@ -47,7 +63,10 @@ export default function HomeScreen({ navigation }) {
             <Text style={s.greet}>Bonjour 👋</Text>
             <Text style={s.uname}>PadelKom <Text style={{color:COLORS.green}}>.</Text></Text>
           </View>
-          <TouchableOpacity style={s.notifBtn}><Text style={{fontSize:20}}>🔔</Text><View style={s.notifDot}/></TouchableOpacity>
+          <TouchableOpacity style={s.notifBtn} onPress={() => navigation.navigate('Notifications')}>
+            <Text style={{fontSize:20}}>🔔</Text>
+            {nbNotifs > 0 && <View style={s.notifDot}><Text style={{fontSize:8,color:'#000',fontWeight:'900'}}>{nbNotifs > 9 ? '9+' : nbNotifs}</Text></View>}
+          </TouchableOpacity>
         </View>
         <View style={s.banner}>
           <View><Text style={s.bannerTitle}>Trouve ton match 🎾</Text><Text style={s.bannerSub}>Casablanca · Niveau certifié</Text></View>
@@ -98,7 +117,7 @@ const s = StyleSheet.create({
   greet:{fontSize:13,color:COLORS.text2},
   uname:{fontSize:24,fontWeight:'900',color:COLORS.text},
   notifBtn:{width:44,height:44,backgroundColor:COLORS.card,borderRadius:RADIUS.md,borderWidth:1,borderColor:COLORS.border,alignItems:'center',justifyContent:'center',position:'relative'},
-  notifDot:{position:'absolute',top:8,right:9,width:8,height:8,backgroundColor:COLORS.green,borderRadius:4,borderWidth:2,borderColor:COLORS.dark},
+  notifDot:{position:'absolute',top:6,right:6,minWidth:16,height:16,backgroundColor:COLORS.green,borderRadius:8,alignItems:'center',justifyContent:'center',paddingHorizontal:3},
   banner:{marginHorizontal:SPACING.md,marginBottom:SPACING.md,backgroundColor:COLORS.green,borderRadius:RADIUS.lg,padding:18,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
   bannerTitle:{fontSize:16,fontWeight:'900',color:'#0A0A0A',marginBottom:4},
   bannerSub:{fontSize:12,color:'rgba(0,0,0,0.6)'},

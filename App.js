@@ -17,6 +17,7 @@ import TournoisScreen from './src/screens/TournoisScreen';
 import MessagesScreen from './src/screens/MessagesScreen';
 import MonProfilScreen from './src/screens/MonProfilScreen';
 import EditProfilScreen from './src/screens/EditProfilScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -68,6 +69,7 @@ export default function App() {
         <Stack.Screen name="Niveau" component={NiveauScreen} />
         <Stack.Screen name="Main" component={MainTabs} initialParams={{userId: null}} />
         <Stack.Screen name="EditProfil" component={EditProfilScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
