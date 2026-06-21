@@ -9,7 +9,7 @@ export default function ConnexionScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleConnexion = async () => {
-    if (!email || !mdp) { Alert.alert('⚠️', 'Remplis ton email et mot de passe.'); return; }
+    if (!email || !mdp) { window.alert('Remplis ton email et mot de passe.'); return; }
     setLoading(true);
     const result = await connecter({ email, motDePasse: mdp });
     setLoading(false);
@@ -19,7 +19,7 @@ navigation.reset({
   routes: [{ name: 'Main', params: { userId: result.user.id } }] 
 });  
     } else {
-      Alert.alert('❌ Erreur', result.error);
+      window.alert('Erreur : ' + result.error);
     }
   };
 

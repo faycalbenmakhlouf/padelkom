@@ -27,8 +27,8 @@ export default function CreerMatchScreen({ navigation }) {
   };
 
   const publier = async () => {
-    if (!type) { Alert.alert('⚠️','Choisis le type de match.'); return; }
-    if (!niveau) { Alert.alert('⚠️','Choisis le niveau.'); return; }
+    if (!type) { window.alert('Choisis le type de match.'); return; }
+    if (!niveau) { window.alert('Choisis le niveau.'); return; }
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -40,8 +40,9 @@ export default function CreerMatchScreen({ navigation }) {
       });
       setLoading(false);
       if (error) throw error;
-      Alert.alert('🚀 Match publié !','Les joueurs compatibles ont été notifiés.',[{text:'Super !',onPress:()=>navigation.navigate('Home')}]);
-    } catch(e) { setLoading(false); Alert.alert('❌ Erreur',e.message); }
+      window.alert('Match publié ! Les joueurs compatibles ont été notifiés.');
+      navigation.navigate('Home');
+    } catch(e) { setLoading(false); window.alert('Erreur : ' + e.message); }
   };
 
   return (

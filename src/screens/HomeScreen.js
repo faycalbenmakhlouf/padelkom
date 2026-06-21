@@ -35,7 +35,7 @@ export default function HomeScreen({ navigation }) {
   const rejoindre = async (match) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { Alert.alert('⚠️','Tu dois être connecté.'); return; }
+      if (!user) { window.alert('Tu dois être connecté.'); return; }
       const { error } = await supabase.from('participations').insert({ match_id: match.id, joueur_id: user.id, statut: 'en_attente', cote: 'Peu importe' });
       if (error) throw error;
       const { data: profil } = await supabase.from('profiles').select('prenom, nom').eq('id', user.id).single();
