@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
 import { COLORS, RADIUS, SPACING } from '../theme/colors';
+import { supabase } from '../config/supabase';
 
 const NIVEAUX = [
   {num:1,label:'Débutant',desc:'Découverte du jeu. Apprentissage des règles fondamentales. Échanges très courts sans utiliser les vitres.'},
@@ -15,6 +16,19 @@ const NIVEAUX = [
 
 export default function NiveauScreen({ navigation }) {
   const [niveau, setNiveau] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleCommencer = async () => {
+    if (!niveau) return;
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id) {
+      await supabase.from('profiles').update({ niveau }).eq('id', session.user.id);
+    }
+    setLoading(false);
+    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+  };
+
   return (
     <SafeAreaView style={s.safe}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -38,8 +52,8 @@ export default function NiveauScreen({ navigation }) {
         </View>
         <View style={{paddingHorizontal:SPACING.md,paddingBottom:32,flexDirection:'row',gap:10}}>
           <TouchableOpacity style={s.btnBack} onPress={()=>navigation.goBack()} activeOpacity={0.8}><Text style={{fontSize:20,color:COLORS.text}}>←</Text></TouchableOpacity>
-          <TouchableOpacity style={[s.btn,{flex:1,opacity:niveau?1:0.5}]} onPress={()=>niveau&&navigation.navigate('Main')} activeOpacity={0.85}>
-            <Text style={s.btnText}>Commencer 🚀</Text>
+          <TouchableOpacity style={[s.btn,{flex:1,opacity:niveau?1:0.5}]} onPress={handleCommencer} disabled={loading} activeOpacity={0.85}>
+            {loading ? <ActivityIndicator color="#000" /> : <Text style={s.btnText}>Commencer 🚀</Text>}
           </TouchableOpacity>
         </View>
       </ScrollView>

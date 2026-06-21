@@ -18,12 +18,12 @@ export default function InscriptionScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleSuivant = async () => {
-    if (!prenom || !nom || !email || !mdp) { Alert.alert('⚠️', 'Remplis au moins prénom, nom, email et mot de passe.'); return; }
+    if (!prenom || !nom || !email || !mdp) { window.alert('Remplis au moins prénom, nom, email et mot de passe.'); return; }
     setLoading(true);
     const result = await inscrire({ email, motDePasse: mdp, prenom, nom, genre, dateNaissance: naissance, ville, quartier, licenceFRMT: licence });
     setLoading(false);
     if (result.success) { navigation.navigate('Niveau'); }
-    else { Alert.alert('❌ Erreur', result.error); }
+    else { window.alert('Erreur : ' + result.error); }
   };
 
   return (

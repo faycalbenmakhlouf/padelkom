@@ -44,7 +44,10 @@ export default function EditProfilScreen({ navigation }) {
   };
 
   const sauvegarder = async () => {
-    if (!form.prenom.trim()) { Alert.alert('⚠️', 'Le prénom est obligatoire.'); return; }
+    if (!form.prenom.trim()) { window.alert('Le prénom est obligatoire.'); return; }
+    const { data: { session } } = await supabase.auth.getSession();
+    const id = userId || session?.user?.id;
+    if (!id) { window.alert('Session expirée, reconnecte-toi.'); return; }
     setSaving(true);
     const { error } = await supabase.from('profiles').update({
       prenom: form.prenom.trim(),
@@ -54,10 +57,11 @@ export default function EditProfilScreen({ navigation }) {
       quartier: form.quartier.trim(),
       licence_frmt: form.licence_frmt.trim() || null,
       niveau: form.niveau,
-    }).eq('id', userId);
+    }).eq('id', id);
     setSaving(false);
-    if (error) { Alert.alert('❌ Erreur', error.message); return; }
-    Alert.alert('✅ Profil mis à jour !', '', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+    if (error) { window.alert('Erreur : ' + error.message); return; }
+    window.alert('Profil mis à jour !');
+    navigation.goBack();
   };
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
