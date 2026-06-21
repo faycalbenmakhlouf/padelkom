@@ -17,10 +17,18 @@ export default function DemandesScreen({ navigation, route }) {
   const charger = async () => {
     const [{ data: m }, { data: d }] = await Promise.all([
       supabase.from('matchs').select('*').eq('id', matchId).single(),
-      supabase.from('participations').select('*, profiles(prenom, nom, niveau, genre, ville)').eq('match_id', matchId).eq('statut', 'en_attente'),
+      supabase.from('participations').select('*').eq('match_id', matchId).eq('statut', 'en_attente'),
     ]);
     setMatch(m);
-    setDemandes(d || []);
+    if (d && d.length > 0) {
+      const ids = d.map(p => p.joueur_id);
+      const { data: profils } = await supabase.from('profiles').select('id, prenom, nom, niveau, genre, ville').in('id', ids);
+      const profilsMap = {};
+      (profils || []).forEach(p => { profilsMap[p.id] = p; });
+      setDemandes(d.map(p => ({ ...p, profiles: profilsMap[p.joueur_id] || null })));
+    } else {
+      setDemandes([]);
+    }
     setLoading(false);
   };
 
