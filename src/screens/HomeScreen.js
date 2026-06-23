@@ -96,7 +96,14 @@ export default function HomeScreen({ navigation }) {
     if (m.slots && m.slots.length > 0) {
       const libres = m.slots.filter(s => !s.pris);
       if (libres.length === 0) return `🎾 Match complet ✅`;
-      const desc = libres.map(s => s.type === 'binome' ? '🤝 Binôme' : `${s.cote === 'Droit' ? '➡️' : '⬅️'} ${s.cote}`).join(' · ');
+      const desc = libres.map(s => {
+        if (s.type === 'binome') return '🤝 Binôme';
+        let txt = `${s.cote === 'Droit' ? '➡️' : '⬅️'} ${s.cote}`;
+        if (s.classement_min && s.classement_max) txt += ` FRMT ${s.classement_min}–${s.classement_max}`;
+        else if (s.classement_min) txt += ` FRMT min. ${s.classement_min}`;
+        else if (s.classement_max) txt += ` FRMT max. ${s.classement_max}`;
+        return txt;
+      }).join(' · ');
       let msg = `🎾 Cherche : ${desc}\nNiveau ${m.niveau}`;
       if (m.description) msg += `\n💬 ${m.description}`;
       return msg;

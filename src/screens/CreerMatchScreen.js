@@ -32,6 +32,8 @@ const SLOTS_OPTIONS = [
   { id: 'binome', label: 'Binôme', icon: '🤝', type: 'binome', cote: null },
 ];
 
+const CLASSEMENTS_FRMT = ['P25','P50','P100','P250','P500','P1000','P1500'];
+
 // Types d'annonce
 const TYPES_ANNONCE = [
   { id: 'match', label: 'Match', icon: '🎾', desc: 'Cherche des joueurs' },
@@ -52,7 +54,7 @@ export default function CreerMatchScreen({ navigation }) {
 
   const ajouterSlot = (option) => {
     const genre = genreMatch === 'Mixte' ? null : genreMatch;
-    setSlots(s => [...s, { type: option.type, cote: option.cote, genre, pris: false }]);
+    setSlots(s => [...s, { type: option.type, cote: option.cote, genre, pris: false, classement_min: null, classement_max: null }]);
   };
 
   const supprimerSlot = (index) => {
@@ -61,6 +63,10 @@ export default function CreerMatchScreen({ navigation }) {
 
   const setSlotGenre = (index, genre) => {
     setSlots(s => s.map((sl, i) => i === index ? { ...sl, genre } : sl));
+  };
+
+  const setSlotClassement = (index, key, val) => {
+    setSlots(s => s.map((sl, i) => i === index ? { ...sl, [key]: sl[key] === val ? null : val } : sl));
   };
 
   const getMsg = () => {
@@ -75,7 +81,11 @@ export default function CreerMatchScreen({ navigation }) {
     const desc = slots.map(sl => {
       if (sl.type === 'binome') return '🤝 Binôme';
       const g = sl.genre === 'Homme' ? '👨' : sl.genre === 'Femme' ? '👩' : '👤';
-      return `${g} ${sl.cote}`;
+      let s = `${g} ${sl.cote}`;
+      if (sl.classement_min && sl.classement_max) s += ` (FRMT ${sl.classement_min}–${sl.classement_max})`;
+      else if (sl.classement_min) s += ` (FRMT min. ${sl.classement_min})`;
+      else if (sl.classement_max) s += ` (FRMT max. ${sl.classement_max})`;
+      return s;
     }).join(' · ');
     let msg = `🎾 Cherche : ${desc}\nNiveau ${niveau} · ${j} · ${h}\n📍 ${c}`;
     if (description) msg += `\n💬 ${description}`;
@@ -233,25 +243,59 @@ export default function CreerMatchScreen({ navigation }) {
 
           {/* Slots — seulement pour match */}
           {typeAnnonce === 'match' && slots.map((sl, i) => (
-            <View key={i} style={s.slotRow}>
-              <View style={s.slotIcon}>
-                <Text style={{fontSize:18}}>{sl.type === 'binome' ? '🤝' : sl.cote === 'Droit' ? '➡️' : '⬅️'}</Text>
+            <View key={i} style={s.slotCard}>
+              <View style={s.slotCardHead}>
+                <View style={s.slotIcon}>
+                  <Text style={{fontSize:18}}>{sl.type === 'binome' ? '🤝' : sl.cote === 'Droit' ? '➡️' : '⬅️'}</Text>
+                </View>
+                <Text style={s.slotLabel}>{sl.type === 'binome' ? 'Binôme' : `Joueur ${sl.cote}`}</Text>
+                <TouchableOpacity onPress={() => supprimerSlot(i)} style={s.deleteBtn}>
+                  <Text style={{fontSize:16,color:COLORS.text2}}>✕</Text>
+                </TouchableOpacity>
               </View>
-              <View style={{flex:1}}>
-                <Text style={s.slotLabel}>{sl.type === 'binome' ? 'Binôme' : sl.cote}</Text>
-                {sl.type !== 'binome' && genreMatch === 'Mixte' && (
+
+              {/* Genre pour mixte */}
+              {sl.type !== 'binome' && genreMatch === 'Mixte' && (
+                <View style={{marginTop:8}}>
+                  <Text style={s.slotSubLbl}>Genre</Text>
                   <View style={s.miniChips}>
                     {['Homme','Femme'].map(g => (
                       <TouchableOpacity key={g} style={[s.miniChip, sl.genre===g && s.miniChipA]} onPress={() => setSlotGenre(i, g)} activeOpacity={0.8}>
-                        <Text style={[s.miniChipText, sl.genre===g && s.miniChipTextA]}>{g==='Homme'?'👨':' 👩'} {g}</Text>
+                        <Text style={[s.miniChipText, sl.genre===g && s.miniChipTextA]}>{g==='Homme'?'👨':'👩'} {g}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
-                )}
-              </View>
-              <TouchableOpacity onPress={() => supprimerSlot(i)} style={s.deleteBtn}>
-                <Text style={{fontSize:16,color:COLORS.text2}}>✕</Text>
-              </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Classement FRMT — seulement pour joueurs (pas binôme) */}
+              {sl.type !== 'binome' && (
+                <>
+                  <Text style={[s.slotSubLbl, {marginTop:10}]}>🏆 Classement FRMT (optionnel)</Text>
+                  <View style={{gap:6}}>
+                    <View>
+                      <Text style={s.slotSubSubLbl}>Minimum</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:6}}>
+                        {CLASSEMENTS_FRMT.map(c => (
+                          <TouchableOpacity key={c} style={[s.frmtChip, sl.classement_min===c && s.frmtChipA]} onPress={() => setSlotClassement(i, 'classement_min', c)} activeOpacity={0.8}>
+                            <Text style={[s.frmtChipText, sl.classement_min===c && s.frmtChipTextA]}>{c}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                    <View>
+                      <Text style={s.slotSubSubLbl}>Maximum</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:6}}>
+                        {CLASSEMENTS_FRMT.map(c => (
+                          <TouchableOpacity key={c} style={[s.frmtChip, sl.classement_max===c && s.frmtChipA]} onPress={() => setSlotClassement(i, 'classement_max', c)} activeOpacity={0.8}>
+                            <Text style={[s.frmtChipText, sl.classement_max===c && s.frmtChipTextA]}>{c}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                </>
+              )}
             </View>
           ))}
 
@@ -338,9 +382,17 @@ const s = StyleSheet.create({
   genreChipA:{backgroundColor:'rgba(200,245,74,0.07)',borderColor:COLORS.green},
   genreText:{fontSize:12,fontWeight:'700',color:COLORS.text2},
   genreTextA:{color:COLORS.green},
+  slotCard:{backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:12,marginBottom:10,borderWidth:1,borderColor:COLORS.border},
+  slotCardHead:{flexDirection:'row',alignItems:'center',gap:10},
   slotRow:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:COLORS.card,borderRadius:RADIUS.md,padding:12,marginBottom:8,borderWidth:1,borderColor:COLORS.border},
   slotIcon:{width:36,height:36,backgroundColor:COLORS.card2,borderRadius:10,alignItems:'center',justifyContent:'center'},
-  slotLabel:{fontSize:14,fontWeight:'700',color:COLORS.text},
+  slotLabel:{flex:1,fontSize:14,fontWeight:'700',color:COLORS.text},
+  slotSubLbl:{fontSize:11,fontWeight:'700',color:COLORS.text2,marginBottom:6,textTransform:'uppercase',letterSpacing:0.3},
+  slotSubSubLbl:{fontSize:10,color:COLORS.text2,marginBottom:4},
+  frmtChip:{backgroundColor:COLORS.card2,borderRadius:8,paddingVertical:6,paddingHorizontal:12,borderWidth:1,borderColor:COLORS.border},
+  frmtChipA:{backgroundColor:'rgba(200,245,74,0.15)',borderColor:COLORS.green},
+  frmtChipText:{fontSize:12,fontWeight:'700',color:COLORS.text2},
+  frmtChipTextA:{color:COLORS.green},
   miniChips:{flexDirection:'row',gap:6,marginTop:6},
   miniChip:{paddingVertical:4,paddingHorizontal:8,borderRadius:RADIUS.full,borderWidth:1,borderColor:COLORS.border,backgroundColor:COLORS.card2},
   miniChipA:{backgroundColor:COLORS.green,borderColor:COLORS.green},
