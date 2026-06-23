@@ -45,35 +45,44 @@ export default function HomeScreen({ navigation }) {
 
   const onRefresh = () => { setRefreshing(true); chargerMatchs(); };
 
+  const [slotModal, setSlotModal] = useState(null);
+
   const rejoindre = async (match) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { window.alert('Tu dois être connecté.'); return; }
     if (match.createur_id === user.id) { window.alert('Tu es le créateur de ce match.'); return; }
-    if (match.type_match === 'binome') {
-      envoyerDemande(match, user, 'Binôme');
+    if (match.slots && match.slots.length > 0) {
+      const libres = match.slots.filter(s => !s.pris);
+      if (libres.length === 0) { window.alert('Ce match est complet.'); return; }
+      setSlotModal({ match, user, slots: libres });
     } else {
-      setCoteModal({ match, user });
+      envoyerDemande(match, user, 'Libre', null);
     }
   };
 
-  const [coteModal, setCoteModal] = useState(null);
-
-  const envoyerDemande = async (match, user, cote) => {
-    setCoteModal(null);
+  const envoyerDemande = async (match, user, cote, slotIndex) => {
+    setSlotModal(null);
     try {
       const { error } = await supabase.from('participations').insert({ match_id: match.id, joueur_id: user.id, statut: 'en_attente', cote });
       if (error) throw error;
       const { data: profil } = await supabase.from('profiles').select('prenom, nom').eq('id', user.id).single();
       const nomJoueur = profil ? `${profil.prenom} ${profil.nom ? profil.nom[0] + '.' : ''}`.trim() : 'Un joueur';
+      const slotLabel = cote === 'Binôme' ? 'en binôme' : `côté ${cote}`;
       if (match.createur_id && match.createur_id !== user.id) {
-        await supabase.from('notifications').insert({ user_id: match.createur_id, type: 'nouveau_joueur', message: `${nomJoueur} (côté ${cote}) veut rejoindre ton match du ${match.jour} à ${match.heure} — ${match.club}`, match_id: match.id });
+        await supabase.from('notifications').insert({ user_id: match.createur_id, type: 'nouveau_joueur', message: `${nomJoueur} (${slotLabel}) veut rejoindre ton match du ${match.jour} à ${match.heure} — ${match.club}`, match_id: match.id });
       }
-      window.alert('Demande envoyée ! Le créateur va recevoir ta demande.');
+      window.alert('Demande envoyée !');
     } catch(e) { window.alert('Erreur : ' + e.message); }
   };
 
   const formatMsg = (m) => {
-    if (m.type_match==='binome') return `🎾 Cherche binôme ou 2 joueurs (1G · 1D)\nNiveau ${m.niveau}`;
+    if (m.slots && m.slots.length > 0) {
+      const libres = m.slots.filter(s => !s.pris);
+      if (libres.length === 0) return `🎾 Match complet · Niveau ${m.niveau}`;
+      const desc = libres.map(s => s.type === 'binome' ? '🤝 Binôme' : `${s.cote === 'Droit' ? '➡️' : '⬅️'} ${s.cote}`).join(' · ');
+      return `🎾 Cherche : ${desc}\nNiveau ${m.niveau}`;
+    }
+    if (m.type_match==='binome') return `🎾 Cherche binôme · Niveau ${m.niveau}`;
     if (m.type_match==='1j') return `🎾 Cherche 1 joueur · Niveau ${m.niveau}`;
     if (m.type_match==='2j') return `🎾 Cherche 2 joueurs · Niveau ${m.niveau}`;
     if (m.type_match==='3j') return `🎾 Cherche 3 joueurs · Niveau ${m.niveau}`;
@@ -138,20 +147,20 @@ export default function HomeScreen({ navigation }) {
         <View style={{height:32}}/>
       </ScrollView>
 
-      <Modal visible={!!coteModal} transparent animationType="fade">
+      <Modal visible={!!slotModal} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={s.modalBox}>
-            <Text style={s.modalTitle}>Quel côté joues-tu ?</Text>
-            <Text style={s.modalSub}>Le créateur verra ton côté préféré</Text>
+            <Text style={s.modalTitle}>Choisis ton slot</Text>
+            <Text style={s.modalSub}>Sélectionne le poste disponible</Text>
             <View style={s.modalBtns}>
-              {['Droit','Gauche'].map(c => (
-                <TouchableOpacity key={c} style={s.modalBtn} onPress={() => envoyerDemande(coteModal.match, coteModal.user, c)} activeOpacity={0.85}>
-                  <Text style={s.modalBtnIcon}>{c === 'Droit' ? '➡️' : '⬅️'}</Text>
-                  <Text style={s.modalBtnText}>{c}</Text>
+              {slotModal?.slots.map((sl, i) => (
+                <TouchableOpacity key={i} style={s.modalBtn} onPress={() => envoyerDemande(slotModal.match, slotModal.user, sl.type === 'binome' ? 'Binôme' : sl.cote, i)} activeOpacity={0.85}>
+                  <Text style={s.modalBtnIcon}>{sl.type === 'binome' ? '🤝' : sl.cote === 'Droit' ? '➡️' : '⬅️'}</Text>
+                  <Text style={s.modalBtnText}>{sl.type === 'binome' ? 'Binôme' : sl.cote}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity onPress={() => setCoteModal(null)} style={s.modalAnnuler}>
+            <TouchableOpacity onPress={() => setSlotModal(null)} style={s.modalAnnuler}>
               <Text style={s.modalAnnulerText}>Annuler</Text>
             </TouchableOpacity>
           </View>

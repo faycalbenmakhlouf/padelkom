@@ -3,59 +3,73 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Act
 import { COLORS, RADIUS, SPACING } from '../theme/colors';
 import { supabase } from '../config/supabase';
 
-const JOURS = [{j:'Lun',n:'5'},{j:'Mar',n:'6'},{j:'Mer',n:'7'},{j:'Jeu',n:'8'},{j:'Ven',n:'9'}];
-const HEURES = ['08h00','10h00','18h30','19h30','21h00'];
-const CLUBS = [{nom:'Club Californie',meta:'2.1 km'},{nom:'Ain Diab Padel',meta:'3.8 km'},{nom:'Maarif Sport',meta:'5.2 km'}];
+const HEURES = ['08h00','10h00','18h30','19h00','19h30','20h00','20h30','21h00','21h30'];
+const CLUBS = [{nom:'Club Californie',meta:'2.1 km'},{nom:'Ain Diab Padel',meta:'3.8 km'},{nom:'Maarif Sport',meta:'5.2 km'},{nom:'OCC Padel',meta:'4.5 km'}];
 const NIVEAUX = ['1','2','3','4','5','6','7','8','P25','P50','P100','P250','P500','P1000','P1500'];
+const JOURS = [{j:'Lun',n:'5'},{j:'Mar',n:'6'},{j:'Mer',n:'7'},{j:'Jeu',n:'8'},{j:'Ven',n:'9'}];
+
+// Slots possibles à ajouter
+const SLOTS_OPTIONS = [
+  { id: 'droit', label: 'Joueur Droit', icon: '➡️', type: 'joueur', cote: 'Droit' },
+  { id: 'gauche', label: 'Joueur Gauche', icon: '⬅️', type: 'joueur', cote: 'Gauche' },
+  { id: 'binome', label: 'Binôme', icon: '🤝', type: 'binome', cote: null },
+];
 
 export default function CreerMatchScreen({ navigation }) {
   const [jour, setJour] = useState(1);
-  const [heure, setHeure] = useState(3);
+  const [heure, setHeure] = useState(5);
   const [club, setClub] = useState(0);
   const [niveau, setNiveau] = useState(null);
+  const [genreMatch, setGenreMatch] = useState('Homme');
+  const [slots, setSlots] = useState([]); // [{type, cote, genre, pris: false}]
   const [loading, setLoading] = useState(false);
 
-  const [genreMatch, setGenreMatch] = useState(null); // 'Homme' | 'Femme' | 'Mixte' | 'Binome'
-  const [nbJoueurs, setNbJoueurs] = useState(null);   // 1 | 2 | 3
-  const [slots, setSlots] = useState([]);              // [{cote, genre}]
-
-  const isBinome = nbJoueurs === 'binome';
-
-  const handleGenreMatch = (g) => {
-    setGenreMatch(g);
-    setNbJoueurs(null);
-    setSlots([]);
+  const ajouterSlot = (option) => {
+    const genre = genreMatch === 'Mixte' ? null : genreMatch;
+    setSlots(s => [...s, { type: option.type, cote: option.cote, genre, pris: false }]);
   };
 
-  const handleNbJoueurs = (nb) => {
-    setNbJoueurs(nb);
-    setSlots([]);
+  const supprimerSlot = (index) => {
+    setSlots(s => s.filter((_, i) => i !== index));
   };
 
-  const slotsValides = true;
+  const setSlotGenre = (index, genre) => {
+    setSlots(s => s.map((sl, i) => i === index ? { ...sl, genre } : sl));
+  };
 
   const getMsg = () => {
-    if (!genreMatch || !nbJoueurs || !niveau) return '…remplis le formulaire';
+    if (slots.length === 0 || !niveau) return '…remplis le formulaire';
     const h = HEURES[heure], j = JOURS[jour].j, c = CLUBS[club].nom;
-    if (isBinome) return `🎾 Cherche un binôme ${genreMatch} · Niveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
-    const genreLabel = genreMatch === 'Homme' ? '👨' : genreMatch === 'Femme' ? '👩' : '👫';
-    return `🎾 ${genreLabel} ${genreMatch} · Cherche ${nbJoueurs} joueur${nbJoueurs > 1 ? 's' : ''} · Niveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
+    const desc = slots.map(sl => {
+      if (sl.type === 'binome') return '🤝 Binôme';
+      const g = sl.genre === 'Homme' ? '👨' : sl.genre === 'Femme' ? '👩' : '👤';
+      return `${g} ${sl.cote}`;
+    }).join(' · ');
+    return `🎾 Cherche : ${desc}\nNiveau ${niveau} · ${j} · ${h}\n📍 ${c}`;
   };
 
   const publier = async () => {
-    if (!genreMatch) { window.alert('Choisis le type de match.'); return; }
-    if (!isBinome && !nbJoueurs) { window.alert('Choisis le nombre de joueurs.'); return; }
-    if (!isBinome && !slotsValides) { window.alert('Complète les infos pour chaque joueur (côté et genre).'); return; }
+    if (slots.length === 0) { window.alert('Ajoute au moins un joueur recherché.'); return; }
     if (!niveau) { window.alert('Choisis le niveau.'); return; }
+    const mixteIncomplet = genreMatch === 'Mixte' && slots.some(s => s.type !== 'binome' && !s.genre);
+    if (mixteIncomplet) { window.alert('Précise le genre pour chaque joueur.'); return; }
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const nb = isBinome ? 2 : Number(nbJoueurs);
+      const nb = slots.reduce((acc, s) => acc + (s.type === 'binome' ? 2 : 1), 0);
       const { error } = await supabase.from('matchs').insert({
-        createur_id: user?.id, jour: JOURS[jour].j, heure: HEURES[heure],
-        club: CLUBS[club].nom, type_match: isBinome ? 'binome' : `${nbJoueurs}j`,
-        genre_match: genreMatch, joueurs_details: isBinome ? null : slots,
-        niveau, places_total: nb, places_libres: nb, statut: 'ouvert', ville: 'Casablanca',
+        createur_id: user?.id,
+        jour: JOURS[jour].j,
+        heure: HEURES[heure],
+        club: CLUBS[club].nom,
+        type_match: slots.length === 1 && slots[0].type === 'binome' ? 'binome' : 'custom',
+        genre_match: genreMatch,
+        slots: slots,
+        niveau,
+        places_total: nb,
+        places_libres: nb,
+        statut: 'ouvert',
+        ville: 'Casablanca',
       });
       setLoading(false);
       if (error) throw error;
@@ -96,46 +110,61 @@ export default function CreerMatchScreen({ navigation }) {
           {CLUBS.map((c,i) => (
             <TouchableOpacity key={i} style={[s.clubCard, club===i && s.clubCardA]} onPress={() => setClub(i)} activeOpacity={0.85}>
               <View style={s.clubIcon}><Text style={{fontSize:20}}>🏟️</Text></View>
-              <View style={{flex:1}}><Text style={s.clubName}>{c.nom}</Text><Text style={s.clubMeta}>{c.meta} · Réservation prochainement</Text></View>
+              <View style={{flex:1}}><Text style={s.clubName}>{c.nom}</Text><Text style={s.clubMeta}>{c.meta}</Text></View>
               {club===i ? <View style={s.check}><Text style={{fontSize:12,color:'#000',fontWeight:'800'}}>✓</Text></View> : <View style={s.radio}/>}
             </TouchableOpacity>
           ))}
 
-          {/* Type de match */}
+          {/* Genre */}
           <Text style={s.lbl}>⚥ Type de match</Text>
-          <View style={s.chips4}>
+          <View style={s.genreRow}>
             {['Homme','Femme','Mixte'].map(g => (
-              <TouchableOpacity key={g} style={[s.chip4, genreMatch===g && s.chip4A]} onPress={() => handleGenreMatch(g)} activeOpacity={0.8}>
-                <Text style={{fontSize:18}}>{g==='Homme'?'👨':g==='Femme'?'👩':'👫'}</Text>
-                <Text style={[s.chip4Text, genreMatch===g && s.chip4TextA]}>{g}</Text>
+              <TouchableOpacity key={g} style={[s.genreChip, genreMatch===g && s.genreChipA]} onPress={() => setGenreMatch(g)} activeOpacity={0.8}>
+                <Text style={{fontSize:16}}>{g==='Homme'?'👨':g==='Femme'?'👩':'👫'}</Text>
+                <Text style={[s.genreText, genreMatch===g && s.genreTextA]}>{g}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* Nombre de joueurs */}
-          {genreMatch && (
-            <>
-              <Text style={s.lbl}>👥 Tu cherches</Text>
-              <View style={s.row}>
-                {[1,2,3].map(n => (
-                  <TouchableOpacity key={n} style={[s.nbChip, nbJoueurs===n && s.nbChipA]} onPress={() => handleNbJoueurs(n)} activeOpacity={0.8}>
-                    <Text style={[s.nbText, nbJoueurs===n && {color:COLORS.green}]}>{n} joueur{n>1?'s':''}</Text>
-                  </TouchableOpacity>
-                ))}
+          {/* Joueurs recherchés */}
+          <Text style={s.lbl}>👥 Joueurs recherchés</Text>
+
+          {/* Slots ajoutés */}
+          {slots.map((sl, i) => (
+            <View key={i} style={s.slotRow}>
+              <View style={s.slotIcon}>
+                <Text style={{fontSize:18}}>{sl.type === 'binome' ? '🤝' : sl.cote === 'Droit' ? '➡️' : '⬅️'}</Text>
               </View>
-              <TouchableOpacity style={[s.binomeBtn, nbJoueurs==='binome' && s.binomeBtnA]} onPress={() => handleNbJoueurs('binome')} activeOpacity={0.8}>
-                <Text style={{fontSize:20}}>🤝</Text>
-                <View style={{flex:1}}>
-                  <Text style={[s.binomeTitle, nbJoueurs==='binome' && {color:COLORS.green}]}>Binôme</Text>
-                  <Text style={s.binomeSub}>Une équipe de 2 joueurs déjà constituée</Text>
-                </View>
-                {nbJoueurs==='binome' && <Text style={{color:COLORS.green,fontSize:16}}>✓</Text>}
+              <View style={{flex:1}}>
+                <Text style={s.slotLabel}>{sl.type === 'binome' ? 'Binôme' : sl.cote}</Text>
+                {sl.type !== 'binome' && genreMatch === 'Mixte' && (
+                  <View style={s.miniChips}>
+                    {['Homme','Femme'].map(g => (
+                      <TouchableOpacity key={g} style={[s.miniChip, sl.genre===g && s.miniChipA]} onPress={() => setSlotGenre(i, g)} activeOpacity={0.8}>
+                        <Text style={[s.miniChipText, sl.genre===g && s.miniChipTextA]}>{g==='Homme'?'👨':' 👩'} {g}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => supprimerSlot(i)} style={s.deleteBtn}>
+                <Text style={{fontSize:16,color:COLORS.text2}}>✕</Text>
               </TouchableOpacity>
-            </>
-          )}
+            </View>
+          ))}
+
+          {/* Boutons d'ajout */}
+          <View style={s.addRow}>
+            {SLOTS_OPTIONS.map(opt => (
+              <TouchableOpacity key={opt.id} style={s.addBtn} onPress={() => ajouterSlot(opt)} activeOpacity={0.8}>
+                <Text style={{fontSize:16}}>{opt.icon}</Text>
+                <Text style={s.addBtnText}>+ {opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* Niveau */}
-          {nbJoueurs && (
+          {slots.length > 0 && (
             <>
               <Text style={s.lbl}>📊 Niveau recherché</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:16}} contentContainerStyle={{gap:8}}>
@@ -150,7 +179,7 @@ export default function CreerMatchScreen({ navigation }) {
 
           {/* Aperçu */}
           <View style={s.preview}>
-            <Text style={s.previewTitle}>👀 Aperçu</Text>
+            <Text style={s.previewTitle}>👀 Aperçu de l'annonce</Text>
             <View style={s.bubble}><Text style={s.bubbleText}>{getMsg()}</Text><Text style={s.bubbleTime}>maintenant ✓✓</Text></View>
           </View>
 
@@ -185,26 +214,23 @@ const s = StyleSheet.create({
   clubMeta:{fontSize:11,color:COLORS.text2},
   check:{width:22,height:22,borderRadius:11,backgroundColor:COLORS.green,alignItems:'center',justifyContent:'center'},
   radio:{width:22,height:22,borderRadius:11,borderWidth:2,borderColor:COLORS.border},
-  chips4:{flexDirection:'row',gap:10,marginBottom:16},
-  chip4:{flex:1,backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:14,borderWidth:1.5,borderColor:COLORS.border,alignItems:'center',gap:6},
-  chip4A:{backgroundColor:'rgba(200,245,74,0.07)',borderColor:COLORS.green},
-  chip4Text:{fontSize:13,fontWeight:'800',color:COLORS.text2},
-  chip4TextA:{color:COLORS.green},
-  nbChip:{flex:1,backgroundColor:COLORS.card,borderRadius:RADIUS.lg,paddingVertical:14,alignItems:'center',borderWidth:1.5,borderColor:COLORS.border},
-  nbChipA:{backgroundColor:'rgba(200,245,74,0.1)',borderColor:COLORS.green},
-  nbText:{fontSize:13,fontWeight:'800',color:COLORS.text2,textAlign:'center'},
-  binomeBtn:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:14,borderWidth:1.5,borderColor:COLORS.border,marginBottom:16},
-  binomeBtnA:{backgroundColor:'rgba(200,245,74,0.07)',borderColor:COLORS.green},
-  binomeTitle:{fontSize:14,fontWeight:'800',color:COLORS.text,marginBottom:2},
-  binomeSub:{fontSize:11,color:COLORS.text2},
-  slotCard:{backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:14,marginBottom:12,borderWidth:1,borderColor:COLORS.border},
-  slotTitle:{fontSize:14,fontWeight:'800',color:COLORS.green,marginBottom:10},
-  slotLabel:{fontSize:11,fontWeight:'700',color:COLORS.text2,marginBottom:6,textTransform:'uppercase'},
-  slotRow:{flexDirection:'row',gap:8,marginBottom:10},
-  slotChip:{flex:1,backgroundColor:COLORS.card2,borderRadius:RADIUS.md,paddingVertical:10,alignItems:'center',borderWidth:1.5,borderColor:COLORS.border},
-  slotChipA:{backgroundColor:'rgba(200,245,74,0.1)',borderColor:COLORS.green},
-  slotChipText:{fontSize:13,fontWeight:'700',color:COLORS.text2},
-  slotChipTextA:{color:COLORS.green},
+  genreRow:{flexDirection:'row',gap:10,marginBottom:16},
+  genreChip:{flex:1,backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:12,alignItems:'center',borderWidth:1.5,borderColor:COLORS.border,gap:4},
+  genreChipA:{backgroundColor:'rgba(200,245,74,0.07)',borderColor:COLORS.green},
+  genreText:{fontSize:12,fontWeight:'700',color:COLORS.text2},
+  genreTextA:{color:COLORS.green},
+  slotRow:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:COLORS.card,borderRadius:RADIUS.md,padding:12,marginBottom:8,borderWidth:1,borderColor:COLORS.border},
+  slotIcon:{width:36,height:36,backgroundColor:COLORS.card2,borderRadius:10,alignItems:'center',justifyContent:'center'},
+  slotLabel:{fontSize:14,fontWeight:'700',color:COLORS.text},
+  miniChips:{flexDirection:'row',gap:6,marginTop:6},
+  miniChip:{paddingVertical:4,paddingHorizontal:8,borderRadius:RADIUS.full,borderWidth:1,borderColor:COLORS.border,backgroundColor:COLORS.card2},
+  miniChipA:{backgroundColor:COLORS.green,borderColor:COLORS.green},
+  miniChipText:{fontSize:11,color:COLORS.text2,fontWeight:'600'},
+  miniChipTextA:{color:'#000'},
+  deleteBtn:{padding:6},
+  addRow:{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:16},
+  addBtn:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:COLORS.card2,borderRadius:RADIUS.md,paddingVertical:8,paddingHorizontal:12,borderWidth:1,borderColor:COLORS.border},
+  addBtnText:{fontSize:12,fontWeight:'700',color:COLORS.text2},
   nvChip:{backgroundColor:COLORS.card2,borderRadius:10,paddingVertical:10,paddingHorizontal:16,borderWidth:1,borderColor:COLORS.border,minWidth:48,alignItems:'center'},
   nvChipA:{backgroundColor:COLORS.green,borderColor:COLORS.green},
   nvText:{fontSize:14,fontWeight:'800',color:COLORS.text2},
