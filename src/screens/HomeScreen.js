@@ -8,6 +8,7 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [nbNotifs, setNbNotifs] = useState(0);
+  const [userId, setUserId] = useState(null);
 
   const chargerMatchs = async () => {
     try {
@@ -26,8 +27,20 @@ export default function HomeScreen({ navigation }) {
   const chargerNotifs = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
+    setUserId(session.user.id);
     const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('lu', false);
     setNbNotifs(count || 0);
+  };
+
+  const ouvrirChat = async (match) => {
+    if (!userId) return;
+    if (match.createur_id === userId) {
+      window.alert('Tu es le créateur de ce match.');
+      return;
+    }
+    const { data: profil } = await supabase.from('profiles').select('prenom, nom').eq('id', match.createur_id).single();
+    const nom = profil ? `${profil.prenom || ''} ${profil.nom ? profil.nom[0] + '.' : ''}`.trim() : 'Joueur';
+    navigation.navigate('Chat', { destinataireId: match.createur_id, destinataireNom: nom, matchId: match.id });
   };
 
   const onRefresh = () => { setRefreshing(true); chargerMatchs(); };
@@ -98,9 +111,14 @@ export default function HomeScreen({ navigation }) {
                   <View style={s.pill}><Text style={s.pillText}>Niveau {m.niveau}</Text></View>
                   <Text style={s.spots}><Text style={{color:COLORS.text,fontWeight:'700'}}>{m.places_libres}</Text> place{m.places_libres>1?'s':''}</Text>
                 </View>
-                <TouchableOpacity style={s.joinBtn} onPress={()=>rejoindre(m)} activeOpacity={0.85}>
-                  <Text style={s.joinBtnText}>🎾 Rejoindre</Text>
-                </TouchableOpacity>
+                <View style={{flexDirection:'row',gap:8}}>
+                  <TouchableOpacity style={[s.joinBtn,{flex:1}]} onPress={()=>rejoindre(m)} activeOpacity={0.85}>
+                    <Text style={s.joinBtnText}>🎾 Rejoindre</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.chatBtn} onPress={()=>ouvrirChat(m)} activeOpacity={0.85}>
+                    <Text style={{fontSize:16}}>💬</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
           </ScrollView>
@@ -143,4 +161,5 @@ const s = StyleSheet.create({
   spots:{fontSize:11,color:COLORS.text2},
   joinBtn:{backgroundColor:COLORS.green,borderRadius:RADIUS.md,paddingVertical:10,alignItems:'center'},
   joinBtnText:{fontSize:13,fontWeight:'800',color:'#000'},
+  chatBtn:{width:40,height:40,backgroundColor:COLORS.card2,borderRadius:RADIUS.md,borderWidth:1,borderColor:COLORS.border,alignItems:'center',justifyContent:'center'},
 });
