@@ -42,7 +42,7 @@ export default function TournoisScreen({ navigation }) {
 
   useEffect(() => { init(); }, []);
   useEffect(() => {
-    const unsub = navigation.addListener('focus', charger);
+    const unsub = navigation.addListener('focus', () => { charger(); chargerMonProfil(); });
     return unsub;
   }, [navigation]);
 
@@ -56,6 +56,15 @@ export default function TournoisScreen({ navigation }) {
       setMonProfil(data);
     }
     await charger();
+  };
+
+  const chargerMonProfil = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const { data } = await supabase.from('profiles')
+      .select('prenom, nom, niveau, telephone, licence_frmt, classement_frmt, genre')
+      .eq('id', session.user.id).single();
+    if (data) setMonProfil(data);
   };
 
   const charger = async () => {
