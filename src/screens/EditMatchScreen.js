@@ -70,6 +70,20 @@ export default function EditMatchScreen({ navigation, route }) {
     navigation.goBack();
   };
 
+  const annulerMatch = async () => {
+    if (!window.confirm('Annuler ce match ? Tous les joueurs seront notifiés.')) return;
+    const { data: parts } = await supabase.from('participations').select('joueur_id').eq('match_id', matchId).in('statut', ['en_attente', 'confirme']);
+    await supabase.from('matchs').update({ statut: 'annule' }).eq('id', matchId);
+    if (parts && parts.length > 0) {
+      await supabase.from('notifications').insert(parts.map(p => ({
+        user_id: p.joueur_id, type: 'match_annule',
+        message: `Le match du ${match?.jour} à ${match?.heure} — ${match?.club} a été annulé par le créateur.`,
+        match_id: matchId,
+      })));
+    }
+    navigation.goBack();
+  };
+
   const getApercu = () => {
     if (!match) return '';
     const libres = slots.filter(s => !s.pris);
@@ -162,6 +176,10 @@ export default function EditMatchScreen({ navigation, route }) {
           <TouchableOpacity style={s.btnComplet} onPress={marquerComplet} activeOpacity={0.85}>
             <Text style={s.btnCompletText}>✅ Marquer comme complet</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={s.btnAnnuler} onPress={annulerMatch} activeOpacity={0.85}>
+            <Text style={s.btnAnnulerText}>🚫 Annuler le match</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -199,6 +217,8 @@ const s = StyleSheet.create({
   bubbleTime: { fontSize: 10, color: COLORS.text2, textAlign: 'right', marginTop: 6 },
   btn: { backgroundColor: COLORS.green, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', marginBottom: 10 },
   btnText: { fontSize: 15, fontWeight: '800', color: '#000' },
-  btnComplet: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center', marginBottom: 32, borderWidth: 1, borderColor: COLORS.border },
+  btnComplet: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   btnCompletText: { fontSize: 14, fontWeight: '700', color: COLORS.text2 },
+  btnAnnuler: { backgroundColor: 'rgba(255,60,60,0.08)', borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center', marginBottom: 32, borderWidth: 1, borderColor: 'rgba(255,60,60,0.2)' },
+  btnAnnulerText: { fontSize: 14, fontWeight: '700', color: '#ff6b6b' },
 });
