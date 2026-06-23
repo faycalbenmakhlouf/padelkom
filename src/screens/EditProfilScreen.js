@@ -17,7 +17,7 @@ export default function EditProfilScreen({ navigation }) {
   const [userId, setUserId] = useState(null);
   const [form, setForm] = useState({
     prenom: '', nom: '', genre: 'Joueur', ville: 'Casablanca',
-    quartier: '', licence_frmt: '', niveau: 1, telephone: '',
+    quartier: '', licence_frmt: '', classement_frmt: '', niveau: 1, telephone: '',
   });
 
   useEffect(() => {
@@ -37,6 +37,7 @@ export default function EditProfilScreen({ navigation }) {
         ville: data.ville || 'Casablanca',
         quartier: data.quartier || '',
         licence_frmt: data.licence_frmt || '',
+        classement_frmt: data.classement_frmt || '',
         niveau: data.niveau || 1,
         telephone: data.telephone || '',
       });
@@ -57,6 +58,7 @@ export default function EditProfilScreen({ navigation }) {
       ville: form.ville,
       quartier: form.quartier.trim(),
       licence_frmt: form.licence_frmt.trim() || null,
+      classement_frmt: form.classement_frmt.trim() || null,
       niveau: form.niveau,
       telephone: form.telephone.trim() || null,
     }).eq('id', id);
@@ -130,9 +132,10 @@ export default function EditProfilScreen({ navigation }) {
         </View>
 
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Licence</Text>
-          <Field label="N° Licence FRMT (optionnel)" value={form.licence_frmt} onChangeText={v => set('licence_frmt', v)} placeholder="Ex: 12345" keyboardType="numeric" />
-          <Field label="WhatsApp (optionnel)" value={form.telephone} onChangeText={v => set('telephone', v)} placeholder="Ex: 0661234567" keyboardType="phone-pad" />
+          <Text style={s.sectionTitle}>FRMT & Contact</Text>
+          <Field label="N° Licence FRMT" value={form.licence_frmt} onChangeText={v => set('licence_frmt', v)} placeholder="Ex: 12345" keyboardType="numeric" />
+          <Field label="Classement FRMT" value={form.classement_frmt} onChangeText={v => set('classement_frmt', v)} placeholder="Ex: P100, P250…" />
+          <Field label="WhatsApp" value={form.telephone} onChangeText={v => set('telephone', v)} placeholder="Ex: 0661234567" keyboardType="phone-pad" />
         </View>
 
         <View style={{ paddingHorizontal: SPACING.md }}>

@@ -29,13 +29,13 @@ export default function TournoisScreen({ navigation }) {
   const [annonces, setAnnonces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(null);
-  const [profil, setProfil] = useState(null);
+  const [monProfil, setMonProfil] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [contactModal, setContactModal] = useState(null); // { annonce, profilCreateur }
   const [categorie, setCategorie] = useState(null);
   const [coteCherche, setCoteCherche] = useState(null);
   const [clubSelec, setClubSelec] = useState(null);
   const [jourSelec, setJourSelec] = useState(0);
-  const [niveauMin, setNiveauMin] = useState(null);
   const [description, setDescription] = useState('');
   const [publishing, setPublishing] = useState(false);
   const JOURS = getProchainJours();
@@ -50,8 +50,10 @@ export default function TournoisScreen({ navigation }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       setUserId(session.user.id);
-      const { data } = await supabase.from('profiles').select('prenom, nom, niveau, telephone').eq('id', session.user.id).single();
-      setProfil(data);
+      const { data } = await supabase.from('profiles')
+        .select('prenom, nom, niveau, telephone, licence_frmt, classement_frmt, genre')
+        .eq('id', session.user.id).single();
+      setMonProfil(data);
     }
     await charger();
   };
@@ -69,12 +71,18 @@ export default function TournoisScreen({ navigation }) {
     if (!categorie) { window.alert('Choisis la catégorie du tournoi.'); return; }
     if (!coteCherche) { window.alert('Précise le côté recherché.'); return; }
     if (!clubSelec) { window.alert('Choisis le club / lieu.'); return; }
+    // Vérifier que le profil a licence + classement
+    if (!monProfil?.licence_frmt || !monProfil?.classement_frmt) {
+      window.alert('Complète ton profil avec ta licence FRMT et ton classement avant de publier une annonce tournoi.');
+      navigation.navigate('EditProfil');
+      return;
+    }
     setPublishing(true);
     const { error } = await supabase.from('tournois_annonces').insert({
       createur_id: userId, categorie, cote_cherche: coteCherche, club: clubSelec,
       date_tournoi: JOURS[jourSelec].date,
       date_label: JOURS[jourSelec].n + ' ' + JOURS[jourSelec].mois,
-      niveau_min: niveauMin, description: description.trim() || null, statut: 'ouvert',
+      description: description.trim() || null, statut: 'ouvert',
     });
     setPublishing(false);
     if (error) { window.alert('Erreur : ' + error.message); return; }
@@ -88,27 +96,45 @@ export default function TournoisScreen({ navigation }) {
     charger();
   };
 
-  const contacter = async (annonce) => {
-    const { data: p } = await supabase.from('profiles').select('prenom, nom, telephone').eq('id', annonce.createur_id).single();
-    if (p?.telephone) {
-      const tel = p.telephone.replace(/\s/g, '').replace(/^0/, '212');
-      Linking.openURL('https://wa.me/' + tel);
+  const ouvrirContactModal = async (annonce) => {
+    // Vérifier que le répondant a licence + classement
+    if (!monProfil?.licence_frmt || !monProfil?.classement_frmt) {
+      window.alert('Pour contacter ce joueur, complète d\'abord ton profil avec ta licence FRMT et ton classement.');
+      navigation.navigate('EditProfil');
+      return;
+    }
+    const { data: pc } = await supabase.from('profiles')
+      .select('prenom, nom, niveau, genre, telephone, licence_frmt, classement_frmt')
+      .eq('id', annonce.createur_id).single();
+    setContactModal({ annonce, profilCreateur: pc });
+  };
+
+  const confirmerContact = () => {
+    const { annonce, profilCreateur: pc } = contactModal;
+    setContactModal(null);
+    if (pc?.telephone) {
+      const tel = pc.telephone.replace(/\s/g, '').replace(/^0/, '212');
+      const nom = monProfil ? (monProfil.prenom || 'Joueur') : 'Joueur';
+      const msg = 'Bonjour, je réponds à ton annonce tournoi ' + annonce.categorie + ' du ' + annonce.date_label + ' à ' + annonce.club + '. Licence FRMT: ' + (monProfil?.licence_frmt || '—') + ' | Classement: ' + (monProfil?.classement_frmt || '—') + '. Cordialement, ' + nom;
+      Linking.openURL('https://wa.me/' + tel + '?text=' + encodeURIComponent(msg));
     } else {
-      const nom = p ? ((p.prenom || '') + ' ' + (p.nom ? p.nom[0] + '.' : '')).trim() : 'Joueur';
+      const nom = pc ? ((pc.prenom || '') + ' ' + (pc.nom ? pc.nom[0] + '.' : '')).trim() : 'Joueur';
       navigation.navigate('Chat', { destinataireId: annonce.createur_id, destinataireNom: nom, matchId: null });
     }
   };
 
   const resetForm = () => {
     setCategorie(null); setCoteCherche(null); setClubSelec(null);
-    setJourSelec(0); setNiveauMin(null); setDescription('');
+    setJourSelec(0); setDescription('');
   };
 
   const getApercu = () => {
     if (!categorie || !coteCherche || !clubSelec) return '…remplis le formulaire';
     const d = JOURS[jourSelec].n + ' ' + JOURS[jourSelec].mois;
+    const licence = monProfil?.licence_frmt || 'XXXXX';
+    const classement = monProfil?.classement_frmt || 'P???';
     let msg = '🏆 Bonjour, je cherche un partenaire côté ' + coteCherche + ' pour le tournoi ' + categorie + ' à ' + clubSelec + ' le ' + d + '.';
-    if (niveauMin) msg += '\nNiveau minimum : ' + niveauMin;
+    msg += '\n📋 Licence: ' + licence + ' | Classement: ' + classement;
     if (description) msg += '\n💬 ' + description;
     return msg;
   };
@@ -130,13 +156,13 @@ export default function TournoisScreen({ navigation }) {
           <Text style={s.bannerIcon}>🏆</Text>
           <View style={{ flex: 1 }}>
             <Text style={s.bannerTitle}>Tournois FRMT</Text>
-            <Text style={s.bannerSub}>Publie une annonce pour trouver ton partenaire de tournoi</Text>
+            <Text style={s.bannerSub}>Licence + classement obligatoires pour publier ou contacter</Text>
           </View>
         </View>
 
         <View style={{ paddingHorizontal: SPACING.md }}>
           <Text style={s.sectionTitle}>
-            {loading ? 'Chargement…' : annonces.length + ' annonce' + (annonces.length !== 1 ? 's' : '') + ' disponible' + (annonces.length !== 1 ? 's' : '')}
+            {loading ? 'Chargement…' : annonces.length + ' annonce' + (annonces.length !== 1 ? 's' : '')}
           </Text>
           {loading ? (
             <View style={s.center}><ActivityIndicator color={COLORS.green} size="large" /></View>
@@ -152,13 +178,53 @@ export default function TournoisScreen({ navigation }) {
           ) : (
             annonces.map(a => (
               <AnnonceCard key={a.id} annonce={a} isOwn={a.createur_id === userId}
-                onContacter={() => contacter(a)} onAnnuler={() => annulerAnnonce(a.id)} />
+                onContacter={() => ouvrirContactModal(a)} onAnnuler={() => annulerAnnonce(a.id)} />
             ))
           )}
         </View>
         <View style={{ height: 32 }} />
       </ScrollView>
 
+      {/* Modal confirmation contact — montre les deux profils */}
+      <Modal visible={!!contactModal} transparent animationType="fade">
+        <View style={s.overlayDark}>
+          <View style={s.contactBox}>
+            <Text style={s.contactTitle}>📋 Profils partagés</Text>
+            <Text style={s.contactSub}>Ces informations seront visibles lors du contact</Text>
+
+            <View style={s.profilsRow}>
+              {/* Ton profil */}
+              <View style={s.profilCard}>
+                <Text style={s.profilLabel}>Toi</Text>
+                <Text style={s.profilNom}>{monProfil?.prenom || 'Joueur'}</Text>
+                <Text style={s.profilInfo}>🪪 {monProfil?.licence_frmt || '—'}</Text>
+                <Text style={s.profilInfo}>🏆 {monProfil?.classement_frmt || '—'}</Text>
+              </View>
+
+              <Text style={{ fontSize: 20, color: COLORS.text2, alignSelf: 'center' }}>↔️</Text>
+
+              {/* Profil du créateur */}
+              <View style={s.profilCard}>
+                <Text style={s.profilLabel}>Annonceur</Text>
+                <Text style={s.profilNom}>{contactModal?.profilCreateur?.prenom || 'Joueur'}</Text>
+                <Text style={s.profilInfo}>🪪 {contactModal?.profilCreateur?.licence_frmt || '—'}</Text>
+                <Text style={s.profilInfo}>🏆 {contactModal?.profilCreateur?.classement_frmt || '—'}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={s.contactBtn} onPress={confirmerContact} activeOpacity={0.85}>
+              <Text style={s.contactBtnText}>
+                {contactModal?.profilCreateur?.telephone ? '💬 Contacter via WhatsApp' : '💬 Envoyer un message'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setContactModal(null)} style={s.contactAnnuler}>
+              <Text style={s.contactAnnulerText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal formulaire */}
       <Modal visible={showForm} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <View style={s.modalBox}>
@@ -168,6 +234,14 @@ export default function TournoisScreen({ navigation }) {
                 <Text style={{ fontSize: 18, color: COLORS.text2 }}>✕</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Avertissement si profil incomplet */}
+            {(!monProfil?.licence_frmt || !monProfil?.classement_frmt) && (
+              <TouchableOpacity style={s.alertBanner} onPress={() => { setShowForm(false); navigation.navigate('EditProfil'); }} activeOpacity={0.8}>
+                <Text style={s.alertText}>⚠️ Complète ta licence FRMT et ton classement dans ton profil avant de publier</Text>
+              </TouchableOpacity>
+            )}
+
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={s.lbl}>🏆 Catégorie</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
@@ -208,15 +282,6 @@ export default function TournoisScreen({ navigation }) {
                 ))}
               </ScrollView>
 
-              <Text style={s.lbl}>📊 Niveau minimum (optionnel)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
-                {CATEGORIES.map(n => (
-                  <TouchableOpacity key={n} style={[s.chip, niveauMin === n && s.chipA]} onPress={() => setNiveauMin(niveauMin === n ? null : n)} activeOpacity={0.8}>
-                    <Text style={[s.chipText, niveauMin === n && s.chipTextA]}>{n}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
               <Text style={s.lbl}>💬 Message (optionnel)</Text>
               <TextInput style={s.textInput} value={description} onChangeText={setDescription}
                 placeholder="Ex: Sérieux et régulier, disponible les weekends" placeholderTextColor={COLORS.text2} multiline numberOfLines={3} />
@@ -243,8 +308,8 @@ export default function TournoisScreen({ navigation }) {
 function AnnonceCard({ annonce: a, isOwn, onContacter, onAnnuler }) {
   const [p, setP] = useState(null);
   useEffect(() => {
-    supabase.from('profiles').select('prenom, nom, niveau, genre').eq('id', a.createur_id).single()
-      .then(({ data }) => { if (data) setP(data); });
+    supabase.from('profiles').select('prenom, nom, niveau, genre, licence_frmt, classement_frmt')
+      .eq('id', a.createur_id).single().then(({ data }) => { if (data) setP(data); });
   }, []);
   const nom = p ? ((p.prenom || 'Joueur') + ' ' + (p.nom ? p.nom[0] + '.' : '')).trim() : 'Joueur';
   return (
@@ -259,7 +324,10 @@ function AnnonceCard({ annonce: a, isOwn, onContacter, onAnnuler }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.cardNom}>{nom}{isOwn ? ' (moi)' : ''}</Text>
-          {p?.niveau && <Text style={s.cardMeta}>Niveau {p.niveau}</Text>}
+          <View style={s.licenceRow}>
+            {p?.licence_frmt ? <Text style={s.licenceText}>🪪 {p.licence_frmt}</Text> : null}
+            {p?.classement_frmt ? <Text style={s.classementText}>🏆 {p.classement_frmt}</Text> : null}
+          </View>
           <View style={s.coteBadge}>
             <Text style={s.coteIcon}>{a.cote_cherche === 'Droit' ? '➡️' : a.cote_cherche === 'Gauche' ? '⬅️' : '↔️'}</Text>
             <Text style={s.coteText}>Cherche côté {a.cote_cherche}</Text>
@@ -267,7 +335,6 @@ function AnnonceCard({ annonce: a, isOwn, onContacter, onAnnuler }) {
         </View>
       </View>
       <Text style={s.cardLieu}>📍 {a.club}</Text>
-      {a.niveau_min && <Text style={s.cardNiveauMin}>Niveau min. {a.niveau_min}</Text>}
       {a.description && <Text style={s.cardDesc}>💬 {a.description}</Text>}
       {isOwn ? (
         <TouchableOpacity style={s.annulerBtn} onPress={onAnnuler} activeOpacity={0.8}>
@@ -306,21 +373,39 @@ const s = StyleSheet.create({
   cardDate: { fontSize: 13, fontWeight: '700', color: COLORS.text },
   cardBody: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   avatarWrap: { width: 44, height: 44, borderRadius: 13, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
-  cardNom: { fontSize: 15, fontWeight: '800', color: COLORS.text, marginBottom: 2 },
-  cardMeta: { fontSize: 11, color: COLORS.text2, marginBottom: 4 },
+  cardNom: { fontSize: 15, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
+  licenceRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
+  licenceText: { fontSize: 11, color: COLORS.text2, fontWeight: '600' },
+  classementText: { fontSize: 11, color: COLORS.green, fontWeight: '700' },
   coteBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.card2, borderRadius: RADIUS.full, paddingVertical: 3, paddingHorizontal: 8, alignSelf: 'flex-start' },
   coteIcon: { fontSize: 12 },
   coteText: { fontSize: 11, color: COLORS.text, fontWeight: '700' },
   cardLieu: { fontSize: 12, color: COLORS.text2, marginBottom: 4 },
-  cardNiveauMin: { fontSize: 11, color: COLORS.text2, marginBottom: 4 },
   cardDesc: { fontSize: 13, color: COLORS.text2, fontStyle: 'italic', marginBottom: 10, lineHeight: 18 },
   contacterBtn: { backgroundColor: COLORS.green, borderRadius: RADIUS.md, paddingVertical: 10, alignItems: 'center' },
   contacterText: { fontSize: 13, fontWeight: '800', color: '#000' },
   annulerBtn: { borderRadius: RADIUS.md, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,60,60,0.2)', backgroundColor: 'rgba(255,60,60,0.05)' },
   annulerText: { fontSize: 13, color: '#ff6b6b', fontWeight: '700' },
+  // Modal contact
+  overlayDark: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
+  contactBox: { backgroundColor: COLORS.dark, borderRadius: 20, padding: 20, width: '88%', borderWidth: 1, borderColor: COLORS.border },
+  contactTitle: { fontSize: 17, fontWeight: '900', color: COLORS.text, textAlign: 'center', marginBottom: 4 },
+  contactSub: { fontSize: 12, color: COLORS.text2, textAlign: 'center', marginBottom: 16 },
+  profilsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+  profilCard: { flex: 1, backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 12, borderWidth: 1, borderColor: COLORS.border },
+  profilLabel: { fontSize: 10, fontWeight: '700', color: COLORS.text2, textTransform: 'uppercase', marginBottom: 6 },
+  profilNom: { fontSize: 14, fontWeight: '800', color: COLORS.text, marginBottom: 6 },
+  profilInfo: { fontSize: 12, color: COLORS.text2, marginBottom: 3 },
+  contactBtn: { backgroundColor: COLORS.green, borderRadius: RADIUS.lg, paddingVertical: 13, alignItems: 'center', marginBottom: 10 },
+  contactBtnText: { fontSize: 14, fontWeight: '800', color: '#000' },
+  contactAnnuler: { alignItems: 'center', paddingVertical: 8 },
+  contactAnnulerText: { fontSize: 13, color: COLORS.text2 },
+  // Modal formulaire
+  alertBanner: { backgroundColor: 'rgba(255,200,50,0.1)', borderRadius: RADIUS.md, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,200,50,0.3)' },
+  alertText: { fontSize: 12, color: '#ffc832', fontWeight: '600', lineHeight: 18 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalBox: { backgroundColor: COLORS.dark, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: SPACING.md, maxHeight: '92%', borderTopWidth: 1, borderColor: COLORS.border },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: '900', color: COLORS.text },
   lbl: { fontSize: 11, fontWeight: '700', color: COLORS.text2, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   chip: { backgroundColor: COLORS.card, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: COLORS.border },
