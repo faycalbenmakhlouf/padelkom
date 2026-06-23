@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, RefreshControl, Modal } from 'react-native';
 import { COLORS, RADIUS, SPACING } from '../theme/colors';
 import { supabase } from '../config/supabase';
 
@@ -46,15 +46,27 @@ export default function HomeScreen({ navigation }) {
   const onRefresh = () => { setRefreshing(true); chargerMatchs(); };
 
   const rejoindre = async (match) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { window.alert('Tu dois être connecté.'); return; }
+    if (match.createur_id === user.id) { window.alert('Tu es le créateur de ce match.'); return; }
+    if (match.type_match === 'binome') {
+      envoyerDemande(match, user, 'Binôme');
+    } else {
+      setCoteModal({ match, user });
+    }
+  };
+
+  const [coteModal, setCoteModal] = useState(null);
+
+  const envoyerDemande = async (match, user, cote) => {
+    setCoteModal(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.alert('Tu dois être connecté.'); return; }
-      const { error } = await supabase.from('participations').insert({ match_id: match.id, joueur_id: user.id, statut: 'en_attente', cote: 'Peu importe' });
+      const { error } = await supabase.from('participations').insert({ match_id: match.id, joueur_id: user.id, statut: 'en_attente', cote });
       if (error) throw error;
       const { data: profil } = await supabase.from('profiles').select('prenom, nom').eq('id', user.id).single();
       const nomJoueur = profil ? `${profil.prenom} ${profil.nom ? profil.nom[0] + '.' : ''}`.trim() : 'Un joueur';
       if (match.createur_id && match.createur_id !== user.id) {
-        await supabase.from('notifications').insert({ user_id: match.createur_id, type: 'nouveau_joueur', message: `${nomJoueur} veut rejoindre ton match du ${match.jour} à ${match.heure} — ${match.club}`, match_id: match.id });
+        await supabase.from('notifications').insert({ user_id: match.createur_id, type: 'nouveau_joueur', message: `${nomJoueur} (côté ${cote}) veut rejoindre ton match du ${match.jour} à ${match.heure} — ${match.club}`, match_id: match.id });
       }
       window.alert('Demande envoyée ! Le créateur va recevoir ta demande.');
     } catch(e) { window.alert('Erreur : ' + e.message); }
@@ -125,6 +137,26 @@ export default function HomeScreen({ navigation }) {
         )}
         <View style={{height:32}}/>
       </ScrollView>
+
+      <Modal visible={!!coteModal} transparent animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={s.modalBox}>
+            <Text style={s.modalTitle}>Quel côté joues-tu ?</Text>
+            <Text style={s.modalSub}>Le créateur verra ton côté préféré</Text>
+            <View style={s.modalBtns}>
+              {['Droit','Gauche'].map(c => (
+                <TouchableOpacity key={c} style={s.modalBtn} onPress={() => envoyerDemande(coteModal.match, coteModal.user, c)} activeOpacity={0.85}>
+                  <Text style={s.modalBtnIcon}>{c === 'Droit' ? '➡️' : '⬅️'}</Text>
+                  <Text style={s.modalBtnText}>{c}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity onPress={() => setCoteModal(null)} style={s.modalAnnuler}>
+              <Text style={s.modalAnnulerText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -162,4 +194,14 @@ const s = StyleSheet.create({
   joinBtn:{backgroundColor:COLORS.green,borderRadius:RADIUS.md,paddingVertical:10,alignItems:'center'},
   joinBtnText:{fontSize:13,fontWeight:'800',color:'#000'},
   chatBtn:{width:40,height:40,backgroundColor:COLORS.card2,borderRadius:RADIUS.md,borderWidth:1,borderColor:COLORS.border,alignItems:'center',justifyContent:'center'},
+  modalOverlay:{flex:1,backgroundColor:'rgba(0,0,0,0.7)',alignItems:'center',justifyContent:'center'},
+  modalBox:{backgroundColor:COLORS.card,borderRadius:RADIUS.xl,padding:24,width:'80%',borderWidth:1,borderColor:COLORS.border},
+  modalTitle:{fontSize:18,fontWeight:'900',color:COLORS.text,textAlign:'center',marginBottom:6},
+  modalSub:{fontSize:13,color:COLORS.text2,textAlign:'center',marginBottom:20},
+  modalBtns:{flexDirection:'row',gap:12,marginBottom:12},
+  modalBtn:{flex:1,backgroundColor:COLORS.green,borderRadius:RADIUS.lg,paddingVertical:14,alignItems:'center',gap:4},
+  modalBtnIcon:{fontSize:24},
+  modalBtnText:{fontSize:14,fontWeight:'800',color:'#000'},
+  modalAnnuler:{alignItems:'center',paddingVertical:8},
+  modalAnnulerText:{fontSize:14,color:COLORS.text2},
 });

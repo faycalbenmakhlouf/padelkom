@@ -29,30 +29,17 @@ export default function CreerMatchScreen({ navigation }) {
 
   const handleNbJoueurs = (nb) => {
     setNbJoueurs(nb);
-    if (nb === 'binome') {
-      setSlots([]);
-    } else {
-      setSlots(Array.from({ length: nb }, () => ({ cote: null, genre: genreMatch === 'Mixte' ? null : genreMatch })));
-    }
+    setSlots([]);
   };
 
-  const setSlotCote = (i, cote) => {
-    setSlots(s => s.map((slot, idx) => idx === i ? { ...slot, cote } : slot));
-  };
-
-  const setSlotGenre = (i, genre) => {
-    setSlots(s => s.map((slot, idx) => idx === i ? { ...slot, genre } : slot));
-  };
-
-  const slotsValides = isBinome || (slots.length > 0 && slots.every(s => s.cote && s.genre));
+  const slotsValides = true;
 
   const getMsg = () => {
     if (!genreMatch || !nbJoueurs || !niveau) return '…remplis le formulaire';
     const h = HEURES[heure], j = JOURS[jour].j, c = CLUBS[club].nom;
     if (isBinome) return `🎾 Cherche un binôme ${genreMatch} · Niveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
-    if (!slotsValides) return '…choisis le côté pour chaque joueur';
-    const details = slots.map(sl => `${sl.genre === 'Homme' ? '👨' : '👩'} ${sl.cote}`).join(' · ');
-    return `🎾 ${genreMatch} · Cherche ${nbJoueurs} joueur${nbJoueurs > 1 ? 's' : ''}\n${details} · Niveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
+    const genreLabel = genreMatch === 'Homme' ? '👨' : genreMatch === 'Femme' ? '👩' : '👫';
+    return `🎾 ${genreLabel} ${genreMatch} · Cherche ${nbJoueurs} joueur${nbJoueurs > 1 ? 's' : ''} · Niveau ${niveau}\n📅 ${j} · ${h}\n📍 ${c}`;
   };
 
   const publier = async () => {
@@ -147,35 +134,8 @@ export default function CreerMatchScreen({ navigation }) {
             </>
           )}
 
-          {/* Slots joueurs */}
-          {!isBinome && slots.map((slot, i) => (
-            <View key={i} style={s.slotCard}>
-              <Text style={s.slotTitle}>Joueur {i+1}</Text>
-              {genreMatch === 'Mixte' && (
-                <>
-                  <Text style={s.slotLabel}>Genre</Text>
-                  <View style={s.slotRow}>
-                    {['Homme','Femme'].map(g => (
-                      <TouchableOpacity key={g} style={[s.slotChip, slot.genre===g && s.slotChipA]} onPress={() => setSlotGenre(i, g)} activeOpacity={0.8}>
-                        <Text style={[s.slotChipText, slot.genre===g && s.slotChipTextA]}>{g==='Homme'?'👨 Homme':'👩 Femme'}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              )}
-              <Text style={s.slotLabel}>Côté</Text>
-              <View style={s.slotRow}>
-                {['Droit','Gauche'].map(c => (
-                  <TouchableOpacity key={c} style={[s.slotChip, slot.cote===c && s.slotChipA]} onPress={() => setSlotCote(i, c)} activeOpacity={0.8}>
-                    <Text style={[s.slotChipText, slot.cote===c && s.slotChipTextA]}>{c==='Droit'?'➡️ Droit':'⬅️ Gauche'}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          ))}
-
           {/* Niveau */}
-          {(isBinome || slotsValides) && (
+          {nbJoueurs && (
             <>
               <Text style={s.lbl}>📊 Niveau recherché</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:16}} contentContainerStyle={{gap:8}}>
