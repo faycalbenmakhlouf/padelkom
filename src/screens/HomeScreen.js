@@ -76,16 +76,21 @@ export default function HomeScreen({ navigation }) {
   };
 
   const formatMsg = (m) => {
+    if (m.type_match === 'cession') {
+      let msg = `🏟️ Cession terrain`;
+      if (m.prix) msg += ` · ${m.prix} DH`;
+      if (m.description) msg += `\n💬 ${m.description}`;
+      return msg;
+    }
     if (m.slots && m.slots.length > 0) {
       const libres = m.slots.filter(s => !s.pris);
-      if (libres.length === 0) return `🎾 Match complet · Niveau ${m.niveau}`;
+      if (libres.length === 0) return `🎾 Match complet ✅`;
       const desc = libres.map(s => s.type === 'binome' ? '🤝 Binôme' : `${s.cote === 'Droit' ? '➡️' : '⬅️'} ${s.cote}`).join(' · ');
-      return `🎾 Cherche : ${desc}\nNiveau ${m.niveau}`;
+      let msg = `🎾 Cherche : ${desc}\nNiveau ${m.niveau}`;
+      if (m.description) msg += `\n💬 ${m.description}`;
+      return msg;
     }
     if (m.type_match==='binome') return `🎾 Cherche binôme · Niveau ${m.niveau}`;
-    if (m.type_match==='1j') return `🎾 Cherche 1 joueur · Niveau ${m.niveau}`;
-    if (m.type_match==='2j') return `🎾 Cherche 2 joueurs · Niveau ${m.niveau}`;
-    if (m.type_match==='3j') return `🎾 Cherche 3 joueurs · Niveau ${m.niveau}`;
     return `🎾 Match · Niveau ${m.niveau}`;
   };
 
@@ -133,12 +138,25 @@ export default function HomeScreen({ navigation }) {
                   <Text style={s.spots}><Text style={{color:COLORS.text,fontWeight:'700'}}>{m.places_libres}</Text> place{m.places_libres>1?'s':''}</Text>
                 </View>
                 <View style={{flexDirection:'row',gap:8}}>
-                  <TouchableOpacity style={[s.joinBtn,{flex:1}]} onPress={()=>rejoindre(m)} activeOpacity={0.85}>
-                    <Text style={s.joinBtnText}>🎾 Rejoindre</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.chatBtn} onPress={()=>ouvrirChat(m)} activeOpacity={0.85}>
-                    <Text style={{fontSize:16}}>💬</Text>
-                  </TouchableOpacity>
+                  {m.createur_id === userId ? (
+                    <>
+                      <TouchableOpacity style={[s.joinBtn,{flex:1,backgroundColor:COLORS.card2}]} onPress={()=>navigation.navigate('EditMatch',{matchId:m.id})} activeOpacity={0.85}>
+                        <Text style={[s.joinBtnText,{color:COLORS.text}]}>✏️ Modifier</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.chatBtn} onPress={()=>navigation.navigate('Demandes',{matchId:m.id})} activeOpacity={0.85}>
+                        <Text style={{fontSize:16}}>👥</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity style={[s.joinBtn,{flex:1}]} onPress={()=>rejoindre(m)} activeOpacity={0.85}>
+                        <Text style={s.joinBtnText}>{m.type_match==='cession' ? '🏟️ Contacter' : '🎾 Rejoindre'}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.chatBtn} onPress={()=>ouvrirChat(m)} activeOpacity={0.85}>
+                        <Text style={{fontSize:16}}>💬</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
               </View>
             ))}
