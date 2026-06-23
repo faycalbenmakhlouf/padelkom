@@ -12,7 +12,12 @@ export default function HomeScreen({ navigation }) {
 
   const chargerMatchs = async () => {
     try {
-      const { data } = await supabase.from('matchs').select('*').eq('statut','ouvert').order('created_at',{ascending:false});
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase.from('matchs').select('*')
+        .in('statut', ['ouvert', 'complet'])
+        .or(`date_match.is.null,date_match.gte.${today}`)
+        .order('date_match', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false });
       setMatchs(data || []);
     } catch(e) { setMatchs([]); }
     setLoading(false);
@@ -63,6 +68,12 @@ export default function HomeScreen({ navigation }) {
   const envoyerDemande = async (match, user, cote, slotIndex) => {
     setSlotModal(null);
     try {
+      // Vérifier doublon
+      const { data: existant } = await supabase.from('participations')
+        .select('id').eq('match_id', match.id).eq('joueur_id', user.id)
+        .in('statut', ['en_attente', 'confirme']).maybeSingle();
+      if (existant) { window.alert('Tu as déjà une demande en cours pour ce match.'); return; }
+
       const { error } = await supabase.from('participations').insert({ match_id: match.id, joueur_id: user.id, statut: 'en_attente', cote });
       if (error) throw error;
       const { data: profil } = await supabase.from('profiles').select('prenom, nom').eq('id', user.id).single();

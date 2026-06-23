@@ -6,7 +6,25 @@ import { supabase } from '../config/supabase';
 const HEURES = ['08h00','10h00','18h30','19h00','19h30','20h00','20h30','21h00','21h30'];
 const CLUBS = [{nom:'Club Californie',meta:'2.1 km'},{nom:'Ain Diab Padel',meta:'3.8 km'},{nom:'Maarif Sport',meta:'5.2 km'},{nom:'OCC Padel',meta:'4.5 km'}];
 const NIVEAUX = ['1','2','3','4','5','6','7','8','P25','P50','P100','P250','P500','P1000','P1500'];
-const JOURS = [{j:'Lun',n:'5'},{j:'Mar',n:'6'},{j:'Mer',n:'7'},{j:'Jeu',n:'8'},{j:'Ven',n:'9'}];
+const JOURS_NOMS = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+
+const getProchainJours = () => {
+  const jours = [];
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    jours.push({
+      j: JOURS_NOMS[d.getDay()],
+      n: String(d.getDate()),
+      date: d.toISOString().split('T')[0],
+      label: i === 0 ? 'Aujourd\'hui' : i === 1 ? 'Demain' : null,
+    });
+  }
+  return jours;
+};
+
+const JOURS = getProchainJours();
 
 const SLOTS_OPTIONS = [
   { id: 'droit', label: 'Joueur Droit', icon: '➡️', type: 'joueur', cote: 'Droit' },
@@ -46,7 +64,7 @@ export default function CreerMatchScreen({ navigation }) {
   };
 
   const getMsg = () => {
-    const h = HEURES[heure], j = JOURS[jour].j, c = CLUBS[club].nom;
+    const h = HEURES[heure], j = JOURS[jour].label || JOURS[jour].j, c = CLUBS[club].nom;
     if (typeAnnonce === 'cession') {
       let msg = `🏟️ Cession terrain\n${j} · ${h} · ${c}`;
       if (prix) msg += `\n💰 ${prix} DH`;
@@ -71,8 +89,9 @@ export default function CreerMatchScreen({ navigation }) {
         const { data: { user } } = await supabase.auth.getUser();
         const { error } = await supabase.from('matchs').insert({
           createur_id: user?.id,
-          jour: JOURS[jour].j,
+          jour: JOURS[jour].label || JOURS[jour].j,
           heure: HEURES[heure],
+          date_match: JOURS[jour].date,
           club: CLUBS[club].nom,
           type_match: 'cession',
           genre_match: 'Mixte',
@@ -102,8 +121,9 @@ export default function CreerMatchScreen({ navigation }) {
       const nb = slots.reduce((acc, s) => acc + (s.type === 'binome' ? 2 : 1), 0);
       const { error } = await supabase.from('matchs').insert({
         createur_id: user?.id,
-        jour: JOURS[jour].j,
+        jour: JOURS[jour].label || JOURS[jour].j,
         heure: HEURES[heure],
+        date_match: JOURS[jour].date,
         club: CLUBS[club].nom,
         type_match: slots.length === 1 && slots[0].type === 'binome' ? 'binome' : 'custom',
         genre_match: genreMatch,
@@ -145,7 +165,7 @@ export default function CreerMatchScreen({ navigation }) {
           <View style={s.row}>
             {JOURS.map((d,i) => (
               <TouchableOpacity key={i} style={[s.dchip, jour===i && s.dchipA]} onPress={() => setJour(i)} activeOpacity={0.8}>
-                <Text style={s.dday}>{d.j}</Text>
+                <Text style={[s.dday, d.label && {color:COLORS.green}]}>{d.label || d.j}</Text>
                 <Text style={[s.dnum, jour===i && {color:COLORS.green}]}>{d.n}</Text>
               </TouchableOpacity>
             ))}
