@@ -10,6 +10,8 @@ export default function MonProfilScreen({ navigation, route }) {
   const [profil, setProfil]   = useState(null);
   const [userEmail, setUserEmail] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [mesMatchs, setMesMatchs] = useState([]);
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
     chargerProfil();
@@ -26,10 +28,41 @@ export default function MonProfilScreen({ navigation, route }) {
       const id = session?.user?.id;
       if (session?.user?.email) setUserEmail(session.user.email);
       if (!id) { setLoading(false); return; }
-      const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
+      setUserId(id);
+      const [{ data }, { data: parts }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', id).single(),
+        supabase.from('participations').select('*').eq('joueur_id', id).in('statut', ['en_attente', 'confirme']),
+      ]);
       if (data) setProfil(data);
+      if (parts && parts.length > 0) {
+        const matchIds = parts.map(p => p.match_id);
+        const { data: matchsData } = await supabase.from('matchs').select('*').in('id', matchIds);
+        const matchsMap = {};
+        (matchsData || []).forEach(m => { matchsMap[m.id] = m; });
+        setMesMatchs(parts.map(p => ({ ...p, matchs: matchsMap[p.match_id] || null })));
+      } else {
+        setMesMatchs([]);
+      }
     } catch(e) { console.error('Exception:', e); }
     setLoading(false);
+  };
+
+  const annulerParticipation = async (participation) => {
+    if (!window.confirm('Annuler ta participation à ce match ?')) return;
+    await supabase.from('participations').update({ statut: 'annule' }).eq('id', participation.id);
+    const m = participation.matchs;
+    if (participation.statut === 'confirme' && m) {
+      await supabase.from('matchs').update({ places_libres: (m.places_libres || 0) + 1 }).eq('id', m.id);
+      if (m.createur_id) {
+        const { data: profil } = await supabase.from('profiles').select('prenom').eq('id', userId).single();
+        await supabase.from('notifications').insert({
+          user_id: m.createur_id, type: 'match_annule',
+          message: `${profil?.prenom || 'Un joueur'} a annulé sa participation au match du ${m.jour} à ${m.heure} — ${m.club}.`,
+          match_id: m.id,
+        });
+      }
+    }
+    setMesMatchs(p => p.filter(x => x.id !== participation.id));
   };
 
   const deconnecter = async () => {
@@ -118,6 +151,31 @@ export default function MonProfilScreen({ navigation, route }) {
             ))}
           </View>
         </View>
+        {mesMatchs.length > 0 && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>🎾 Mes participations</Text>
+            {mesMatchs.map(p => {
+              const m = p.matchs;
+              if (!m) return null;
+              return (
+                <View key={p.id} style={s.matchCard}>
+                  <View style={{flex:1}}>
+                    <Text style={s.matchTitre}>{m.jour} · {m.heure}</Text>
+                    <Text style={s.matchMeta}>📍 {m.club}</Text>
+                    <View style={[s.statutBadge, p.statut === 'confirme' && s.statutConfirme]}>
+                      <Text style={[s.statutText, p.statut === 'confirme' && s.statutTextConfirme]}>
+                        {p.statut === 'confirme' ? '✅ Confirmé' : '⏳ En attente'}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={s.annulerBtn} onPress={() => annulerParticipation(p)} activeOpacity={0.8}>
+                    <Text style={s.annulerBtnText}>Annuler</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        )}
         <View style={{paddingHorizontal:SPACING.md, paddingBottom:32}}>
           <TouchableOpacity style={s.btnLogout} onPress={deconnecter} activeOpacity={0.85}>
             <Text style={s.btnLogoutText}>Se déconnecter</Text>
@@ -159,4 +217,13 @@ const s = StyleSheet.create({
   infoVal:{fontSize:13,color:COLORS.text,fontWeight:'600'},
   btnLogout:{backgroundColor:COLORS.card,borderRadius:RADIUS.lg,paddingVertical:14,alignItems:'center',borderWidth:1,borderColor:COLORS.border},
   btnLogoutText:{fontSize:14,fontWeight:'700',color:COLORS.text2},
+  matchCard:{backgroundColor:COLORS.card,borderRadius:RADIUS.lg,padding:14,marginBottom:10,borderWidth:1,borderColor:COLORS.border,flexDirection:'row',alignItems:'center',gap:12},
+  matchTitre:{fontSize:14,fontWeight:'800',color:COLORS.text,marginBottom:3},
+  matchMeta:{fontSize:12,color:COLORS.text2,marginBottom:6},
+  statutBadge:{alignSelf:'flex-start',backgroundColor:'rgba(200,245,74,0.1)',borderRadius:RADIUS.full,paddingVertical:3,paddingHorizontal:8,borderWidth:1,borderColor:'rgba(200,245,74,0.2)'},
+  statutConfirme:{backgroundColor:'rgba(200,245,74,0.15)',borderColor:COLORS.green},
+  statutText:{fontSize:11,color:COLORS.text2,fontWeight:'600'},
+  statutTextConfirme:{color:COLORS.green},
+  annulerBtn:{paddingVertical:8,paddingHorizontal:12,borderRadius:RADIUS.md,borderWidth:1,borderColor:'rgba(255,100,100,0.3)',backgroundColor:'rgba(255,60,60,0.05)'},
+  annulerBtnText:{fontSize:12,color:'#ff6b6b',fontWeight:'700'},
 });

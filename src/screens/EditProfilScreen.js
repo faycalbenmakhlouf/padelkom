@@ -17,7 +17,7 @@ export default function EditProfilScreen({ navigation }) {
   const [userId, setUserId] = useState(null);
   const [form, setForm] = useState({
     prenom: '', nom: '', genre: 'Joueur', ville: 'Casablanca',
-    quartier: '', licence_frmt: '', niveau: 1,
+    quartier: '', licence_frmt: '', niveau: 1, telephone: '',
   });
 
   useEffect(() => {
@@ -38,6 +38,7 @@ export default function EditProfilScreen({ navigation }) {
         quartier: data.quartier || '',
         licence_frmt: data.licence_frmt || '',
         niveau: data.niveau || 1,
+        telephone: data.telephone || '',
       });
     }
     setLoading(false);
@@ -57,6 +58,7 @@ export default function EditProfilScreen({ navigation }) {
       quartier: form.quartier.trim(),
       licence_frmt: form.licence_frmt.trim() || null,
       niveau: form.niveau,
+      telephone: form.telephone.trim() || null,
     }).eq('id', id);
     setSaving(false);
     if (error) { window.alert('Erreur : ' + error.message); return; }
@@ -130,6 +132,7 @@ export default function EditProfilScreen({ navigation }) {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Licence</Text>
           <Field label="N° Licence FRMT (optionnel)" value={form.licence_frmt} onChangeText={v => set('licence_frmt', v)} placeholder="Ex: 12345" keyboardType="numeric" />
+          <Field label="WhatsApp (optionnel)" value={form.telephone} onChangeText={v => set('telephone', v)} placeholder="Ex: 0661234567" keyboardType="phone-pad" />
         </View>
 
         <View style={{ paddingHorizontal: SPACING.md }}>
