@@ -21,6 +21,7 @@ import NotificationsScreen from './src/screens/NotificationsScreen';
 import DemandesScreen from './src/screens/DemandesScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import EditMatchScreen from './src/screens/EditMatchScreen';
+import NotationScreen from './src/screens/NotationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -76,6 +77,7 @@ export default function App() {
         <Stack.Screen name="Demandes" component={DemandesScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="EditMatch" component={EditMatchScreen} />
+        <Stack.Screen name="Notation" component={NotationScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

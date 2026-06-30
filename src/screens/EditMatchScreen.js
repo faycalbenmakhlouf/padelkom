@@ -67,7 +67,7 @@ export default function EditMatchScreen({ navigation, route }) {
   const marquerComplet = async () => {
     if (!window.confirm('Marquer ce match comme complet ?')) return;
     await supabase.from('matchs').update({ statut: 'complet', places_libres: 0 }).eq('id', matchId);
-    navigation.goBack();
+    navigation.replace('Notation', { matchId });
   };
 
   const annulerMatch = async () => {

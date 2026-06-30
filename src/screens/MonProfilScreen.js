@@ -167,9 +167,18 @@ export default function MonProfilScreen({ navigation, route }) {
                       </Text>
                     </View>
                   </View>
-                  <TouchableOpacity style={s.annulerBtn} onPress={() => annulerParticipation(p)} activeOpacity={0.8}>
-                    <Text style={s.annulerBtnText}>Annuler</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {p.statut === 'confirme' && m.statut === 'complet' && (
+                      <TouchableOpacity style={s.noterBtn} onPress={() => navigation.navigate('Notation', { matchId: m.id })} activeOpacity={0.8}>
+                        <Text style={s.noterBtnText}>⭐ Noter</Text>
+                      </TouchableOpacity>
+                    )}
+                    {p.statut !== 'confirme' || m.statut !== 'complet' ? (
+                      <TouchableOpacity style={s.annulerBtn} onPress={() => annulerParticipation(p)} activeOpacity={0.8}>
+                        <Text style={s.annulerBtnText}>Annuler</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                 </View>
               );
             })}
@@ -225,4 +234,6 @@ const s = StyleSheet.create({
   statutTextConfirme:{color:COLORS.green},
   annulerBtn:{paddingVertical:8,paddingHorizontal:12,borderRadius:RADIUS.md,borderWidth:1,borderColor:'rgba(255,100,100,0.3)',backgroundColor:'rgba(255,60,60,0.05)'},
   annulerBtnText:{fontSize:12,color:'#ff6b6b',fontWeight:'700'},
+  noterBtn:{paddingVertical:8,paddingHorizontal:12,borderRadius:RADIUS.md,borderWidth:1,borderColor:'rgba(255,215,0,0.3)',backgroundColor:'rgba(255,215,0,0.08)'},
+  noterBtnText:{fontSize:12,color:'#FFD700',fontWeight:'700'},
 });
