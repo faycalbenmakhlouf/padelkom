@@ -31,7 +31,6 @@ export default function TournoisScreen({ navigation }) {
   const [userId, setUserId] = useState(null);
   const [monProfil, setMonProfil] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [contactModal, setContactModal] = useState(null); // { annonce, profilCreateur }
   const [categorie, setCategorie] = useState(null);
   const [coteCherche, setCoteCherche] = useState(null);
   const [clubSelec, setClubSelec] = useState(null);
@@ -51,7 +50,7 @@ export default function TournoisScreen({ navigation }) {
     if (session?.user) {
       setUserId(session.user.id);
       const { data } = await supabase.from('profiles')
-        .select('prenom, nom, niveau, telephone, licence_frmt, classement_frmt, genre')
+        .select('prenom, nom, niveau, telephone, genre')
         .eq('id', session.user.id).single();
       setMonProfil(data);
     }
@@ -62,7 +61,7 @@ export default function TournoisScreen({ navigation }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
     const { data } = await supabase.from('profiles')
-      .select('prenom, nom, niveau, telephone, licence_frmt, classement_frmt, genre')
+      .select('prenom, nom, niveau, telephone, genre')
       .eq('id', session.user.id).single();
     if (data) setMonProfil(data);
   };
@@ -80,12 +79,6 @@ export default function TournoisScreen({ navigation }) {
     if (!categorie) { window.alert('Choisis la catégorie du tournoi.'); return; }
     if (!coteCherche) { window.alert('Précise le côté recherché.'); return; }
     if (!clubSelec) { window.alert('Choisis le club / lieu.'); return; }
-    // Vérifier que le profil a licence + classement
-    if (!monProfil?.licence_frmt || !monProfil?.classement_frmt) {
-      window.alert('Complète ton profil avec ta licence FRMT et ton classement avant de publier une annonce tournoi.');
-      navigation.navigate('EditProfil');
-      return;
-    }
     setPublishing(true);
     const { error } = await supabase.from('tournois_annonces').insert({
       createur_id: userId, categorie, cote_cherche: coteCherche, club: clubSelec,
@@ -105,26 +98,13 @@ export default function TournoisScreen({ navigation }) {
     charger();
   };
 
-  const ouvrirContactModal = async (annonce) => {
-    // Vérifier que le répondant a licence + classement
-    if (!monProfil?.licence_frmt || !monProfil?.classement_frmt) {
-      window.alert('Pour contacter ce joueur, complète d\'abord ton profil avec ta licence FRMT et ton classement.');
-      navigation.navigate('EditProfil');
-      return;
-    }
+  const contacter = async (annonce) => {
     const { data: pc } = await supabase.from('profiles')
-      .select('prenom, nom, niveau, genre, telephone, licence_frmt, classement_frmt')
-      .eq('id', annonce.createur_id).single();
-    setContactModal({ annonce, profilCreateur: pc });
-  };
-
-  const confirmerContact = () => {
-    const { annonce, profilCreateur: pc } = contactModal;
-    setContactModal(null);
+      .select('prenom, nom, telephone').eq('id', annonce.createur_id).single();
     if (pc?.telephone) {
       const tel = pc.telephone.replace(/\s/g, '').replace(/^0/, '212');
-      const nom = monProfil ? (monProfil.prenom || 'Joueur') : 'Joueur';
-      const msg = 'Bonjour, je réponds à ton annonce tournoi ' + annonce.categorie + ' du ' + annonce.date_label + ' à ' + annonce.club + '. Licence FRMT: ' + (monProfil?.licence_frmt || '—') + ' | Classement: ' + (monProfil?.classement_frmt || '—') + '. Cordialement, ' + nom;
+      const nom = monProfil?.prenom || 'Joueur';
+      const msg = 'Bonjour, je réponds à ton annonce tournoi ' + annonce.categorie + ' du ' + annonce.date_label + ' à ' + annonce.club + '. Cordialement, ' + nom;
       Linking.openURL('https://wa.me/' + tel + '?text=' + encodeURIComponent(msg));
     } else {
       const nom = pc ? ((pc.prenom || '') + ' ' + (pc.nom ? pc.nom[0] + '.' : '')).trim() : 'Joueur';
@@ -140,10 +120,7 @@ export default function TournoisScreen({ navigation }) {
   const getApercu = () => {
     if (!categorie || !coteCherche || !clubSelec) return '…remplis le formulaire';
     const d = JOURS[jourSelec].n + ' ' + JOURS[jourSelec].mois;
-    const licence = monProfil?.licence_frmt || 'XXXXX';
-    const classement = monProfil?.classement_frmt || 'P???';
     let msg = '🏆 Bonjour, je cherche un partenaire côté ' + coteCherche + ' pour le tournoi ' + categorie + ' à ' + clubSelec + ' le ' + d + '.';
-    msg += '\n📋 Licence: ' + licence + ' | Classement: ' + classement;
     if (description) msg += '\n💬 ' + description;
     return msg;
   };
@@ -187,51 +164,12 @@ export default function TournoisScreen({ navigation }) {
           ) : (
             annonces.map(a => (
               <AnnonceCard key={a.id} annonce={a} isOwn={a.createur_id === userId}
-                onContacter={() => ouvrirContactModal(a)} onAnnuler={() => annulerAnnonce(a.id)} />
+                onContacter={() => contacter(a)} onAnnuler={() => annulerAnnonce(a.id)} />
             ))
           )}
         </View>
         <View style={{ height: 32 }} />
       </ScrollView>
-
-      {/* Modal confirmation contact — montre les deux profils */}
-      <Modal visible={!!contactModal} transparent animationType="fade">
-        <View style={s.overlayDark}>
-          <View style={s.contactBox}>
-            <Text style={s.contactTitle}>📋 Profils partagés</Text>
-            <Text style={s.contactSub}>Ces informations seront visibles lors du contact</Text>
-
-            <View style={s.profilsRow}>
-              {/* Ton profil */}
-              <View style={s.profilCard}>
-                <Text style={s.profilLabel}>Toi</Text>
-                <Text style={s.profilNom}>{monProfil?.prenom || 'Joueur'}</Text>
-                <Text style={s.profilInfo}>🪪 {monProfil?.licence_frmt || '—'}</Text>
-                <Text style={s.profilInfo}>🏆 {monProfil?.classement_frmt || '—'}</Text>
-              </View>
-
-              <Text style={{ fontSize: 20, color: COLORS.text2, alignSelf: 'center' }}>↔️</Text>
-
-              {/* Profil du créateur */}
-              <View style={s.profilCard}>
-                <Text style={s.profilLabel}>Annonceur</Text>
-                <Text style={s.profilNom}>{contactModal?.profilCreateur?.prenom || 'Joueur'}</Text>
-                <Text style={s.profilInfo}>🪪 {contactModal?.profilCreateur?.licence_frmt || '—'}</Text>
-                <Text style={s.profilInfo}>🏆 {contactModal?.profilCreateur?.classement_frmt || '—'}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity style={s.contactBtn} onPress={confirmerContact} activeOpacity={0.85}>
-              <Text style={s.contactBtnText}>
-                {contactModal?.profilCreateur?.telephone ? '💬 Contacter via WhatsApp' : '💬 Envoyer un message'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setContactModal(null)} style={s.contactAnnuler}>
-              <Text style={s.contactAnnulerText}>Annuler</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* Modal formulaire */}
       <Modal visible={showForm} animationType="slide" transparent>
@@ -243,13 +181,6 @@ export default function TournoisScreen({ navigation }) {
                 <Text style={{ fontSize: 18, color: COLORS.text2 }}>✕</Text>
               </TouchableOpacity>
             </View>
-
-            {/* Avertissement si profil incomplet */}
-            {(!monProfil?.licence_frmt || !monProfil?.classement_frmt) && (
-              <TouchableOpacity style={s.alertBanner} onPress={() => { setShowForm(false); navigation.navigate('EditProfil'); }} activeOpacity={0.8}>
-                <Text style={s.alertText}>⚠️ Complète ta licence FRMT et ton classement dans ton profil avant de publier</Text>
-              </TouchableOpacity>
-            )}
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={s.lbl}>🏆 Catégorie</Text>
@@ -317,7 +248,7 @@ export default function TournoisScreen({ navigation }) {
 function AnnonceCard({ annonce: a, isOwn, onContacter, onAnnuler }) {
   const [p, setP] = useState(null);
   useEffect(() => {
-    supabase.from('profiles').select('prenom, nom, niveau, genre, licence_frmt, classement_frmt')
+    supabase.from('profiles').select('prenom, nom, niveau, genre')
       .eq('id', a.createur_id).single().then(({ data }) => { if (data) setP(data); });
   }, []);
   const nom = p ? ((p.prenom || 'Joueur') + ' ' + (p.nom ? p.nom[0] + '.' : '')).trim() : 'Joueur';
@@ -333,10 +264,7 @@ function AnnonceCard({ annonce: a, isOwn, onContacter, onAnnuler }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.cardNom}>{nom}{isOwn ? ' (moi)' : ''}</Text>
-          <View style={s.licenceRow}>
-            {p?.licence_frmt ? <Text style={s.licenceText}>🪪 {p.licence_frmt}</Text> : null}
-            {p?.classement_frmt ? <Text style={s.classementText}>🏆 {p.classement_frmt}</Text> : null}
-          </View>
+          {p?.niveau && <Text style={s.cardMeta}>Niveau {p.niveau}</Text>}
           <View style={s.coteBadge}>
             <Text style={s.coteIcon}>{a.cote_cherche === 'Droit' ? '➡️' : a.cote_cherche === 'Gauche' ? '⬅️' : '↔️'}</Text>
             <Text style={s.coteText}>Cherche côté {a.cote_cherche}</Text>

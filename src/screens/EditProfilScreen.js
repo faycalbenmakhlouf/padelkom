@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, ActivityIndicator, Linking,
+  SafeAreaView, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { COLORS, RADIUS, SPACING } from '../theme/colors';
 import { supabase } from '../config/supabase';
@@ -17,7 +17,7 @@ export default function EditProfilScreen({ navigation }) {
   const [userId, setUserId] = useState(null);
   const [form, setForm] = useState({
     prenom: '', nom: '', genre: 'Joueur', ville: 'Casablanca',
-    quartier: '', licence_frmt: '', classement_frmt: '', niveau: 1, telephone: '',
+    quartier: '', niveau: 1, telephone: '',
   });
 
   useEffect(() => {
@@ -36,8 +36,6 @@ export default function EditProfilScreen({ navigation }) {
         genre: data.genre || 'Joueur',
         ville: data.ville || 'Casablanca',
         quartier: data.quartier || '',
-        licence_frmt: data.licence_frmt || '',
-        classement_frmt: data.classement_frmt || '',
         niveau: data.niveau || 1,
         telephone: data.telephone || '',
       });
@@ -57,8 +55,6 @@ export default function EditProfilScreen({ navigation }) {
       genre: form.genre,
       ville: form.ville,
       quartier: form.quartier.trim(),
-      licence_frmt: form.licence_frmt.trim() || null,
-      classement_frmt: form.classement_frmt.trim() || null,
       niveau: form.niveau,
       telephone: form.telephone.trim() || null,
     }).eq('id', id);
@@ -132,21 +128,7 @@ export default function EditProfilScreen({ navigation }) {
         </View>
 
         <View style={s.section}>
-          <Text style={s.sectionTitle}>FRMT & Contact</Text>
-          <Field label="N° Licence FRMT" value={form.licence_frmt} onChangeText={v => set('licence_frmt', v)} placeholder="Ex: 12345" keyboardType="numeric" />
-
-          {form.licence_frmt.trim().length > 0 && (
-            <TouchableOpacity
-              style={s.frmtLink}
-              onPress={() => Linking.openURL('https://www.frmt.ma/classement-padel/')}
-              activeOpacity={0.8}
-            >
-              <Text style={s.frmtLinkText}>🏆 Consulter mon classement sur frmt.ma →</Text>
-              <Text style={s.frmtLinkSub}>Recherche ton numéro de licence et note ton classement ci-dessous</Text>
-            </TouchableOpacity>
-          )}
-
-          <Field label="Classement FRMT" value={form.classement_frmt} onChangeText={v => set('classement_frmt', v)} placeholder="Ex: P100, P250… (voir frmt.ma)" />
+          <Text style={s.sectionTitle}>Contact</Text>
           <Field label="WhatsApp" value={form.telephone} onChangeText={v => set('telephone', v)} placeholder="Ex: 0661234567" keyboardType="phone-pad" />
         </View>
 
@@ -203,7 +185,4 @@ const s = StyleSheet.create({
   niveauLabelActive: { color: '#000' },
   btnSave: { backgroundColor: COLORS.green, borderRadius: RADIUS.lg, paddingVertical: 16, alignItems: 'center' },
   btnSaveText: { fontSize: 16, fontWeight: '800', color: '#000' },
-  frmtLink: { backgroundColor: 'rgba(200,245,74,0.08)', borderRadius: RADIUS.md, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(200,245,74,0.25)' },
-  frmtLinkText: { fontSize: 13, color: COLORS.green, fontWeight: '700', marginBottom: 4 },
-  frmtLinkSub: { fontSize: 11, color: COLORS.text2, lineHeight: 16 },
 });

@@ -142,7 +142,6 @@ export default function MonProfilScreen({ navigation, route }) {
               ['Genre', profil?.genre || '—'],
               ['Ville', profil?.ville || '—'],
               ['Quartier', profil?.quartier || '—'],
-              ['Licence FRMT', profil?.licence_frmt || 'Non renseignée'],
             ].map(([k,v]) => (
               <View key={k} style={s.infoRow}>
                 <Text style={s.infoKey}>{k}</Text>
